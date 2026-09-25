@@ -25,7 +25,8 @@ import java.util.Locale
  *
  * Spalten und Reihenfolge wie in der Druckansicht unter /intern/druck und wie im
  * HTML fuer Android: Da, Zeit, Name, Pers., Tisch/Raum, Telefon, Nr. Wer das Blatt
- * seit Jahren in der Hand hat, soll nicht umlernen muessen.
+ * seit Jahren in der Hand hat, soll nicht umlernen muessen - Hochformat deshalb
+ * ebenso, auch wenn sieben Spalten darauf eng stehen.
  */
 internal class Tagesblattdruck(
     private val blatt: Tagesblatt,
@@ -315,7 +316,7 @@ internal class Tagesblattdruck(
         const val ABSTAND = 8f
 
         val UEBERSCHRIFTEN = listOf("DA", "ZEIT", "NAME", "PERS.", "TISCH / RAUM", "TELEFON", "NR.")
-        val SPALTENBREITEN = floatArrayOf(0.035f, 0.075f, 0.30f, 0.06f, 0.22f, 0.24f, 0.07f)
+        val SPALTENBREITEN = floatArrayOf(0.045f, 0.085f, 0.33f, 0.065f, 0.19f, 0.20f, 0.085f)
 
         val SCHWARZ = Color(0x2A, 0x1C, 0x16)
         val GRAU = Color(0x7A, 0x6A, 0x62)

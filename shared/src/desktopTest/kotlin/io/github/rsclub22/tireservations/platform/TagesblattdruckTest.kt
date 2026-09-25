@@ -60,9 +60,9 @@ class TagesblattdruckTest {
         ),
     )
 
-    /** A4 quer, wie es der Druck vorgibt. */
-    private fun a4Quer() = PageFormat().apply {
-        orientation = PageFormat.LANDSCAPE
+    /** A4 hoch, wie es der Druck vorgibt. */
+    private fun a4Hoch() = PageFormat().apply {
+        orientation = PageFormat.PORTRAIT
         paper = Paper().apply {
             setSize(595.0, 842.0)
             setImageableArea(40.0, 40.0, 515.0, 762.0)
@@ -70,7 +70,7 @@ class TagesblattdruckTest {
     }
 
     private fun zeichneAlle(druck: Tagesblattdruck, format: PageFormat): Int {
-        val bild = BufferedImage(842, 595, BufferedImage.TYPE_INT_RGB)
+        val bild = BufferedImage(595, 842, BufferedImage.TYPE_INT_RGB)
         val g = bild.createGraphics()
         var seiten = 0
         while (druck.print(g, format, seiten) == Printable.PAGE_EXISTS) {
@@ -84,12 +84,12 @@ class TagesblattdruckTest {
     @Test
     fun `wenige Reservierungen passen auf ein Blatt`() {
         val druck = Tagesblattdruck(blatt(8), "Gasthaus Zum braunen Roß", "24.12.2026")
-        assertEquals(1, zeichneAlle(druck, a4Quer()))
+        assertEquals(1, zeichneAlle(druck, a4Hoch()))
     }
 
     @Test
     fun `lange Liste wird auf mehrere Seiten verteilt`() {
-        val format = a4Quer()
+        val format = a4Hoch()
         val druck = Tagesblattdruck(blatt(90), "Gasthaus Zum braunen Roß", "24.12.2026")
 
         val seiten = druck.seitenzahl(format)
@@ -99,9 +99,9 @@ class TagesblattdruckTest {
 
     @Test
     fun `hinter der letzten Seite kommt nichts mehr`() {
-        val format = a4Quer()
+        val format = a4Hoch()
         val druck = Tagesblattdruck(blatt(8), "Gasthaus Zum braunen Roß", "24.12.2026")
-        val bild = BufferedImage(842, 595, BufferedImage.TYPE_INT_RGB)
+        val bild = BufferedImage(595, 842, BufferedImage.TYPE_INT_RGB)
 
         assertEquals(
             Printable.NO_SUCH_PAGE,
@@ -111,7 +111,7 @@ class TagesblattdruckTest {
 
     @Test
     fun `Sperrvermerk kostet Platz auf der ersten Seite`() {
-        val format = a4Quer()
+        val format = a4Hoch()
         val vermerk = Sperrvermerk(
             id = 9000,
             zeit = LocalTime.of(11, 0),
@@ -147,6 +147,6 @@ class TagesblattdruckTest {
             ),
         )
 
-        assertEquals(1, zeichneAlle(Tagesblattdruck(leer, "Gasthaus", "24.12.2026"), a4Quer()))
+        assertEquals(1, zeichneAlle(Tagesblattdruck(leer, "Gasthaus", "24.12.2026"), a4Hoch()))
     }
 }

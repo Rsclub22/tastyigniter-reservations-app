@@ -87,9 +87,9 @@ actual fun drucke(blatt: Tagesblatt, standort: String, gedrucktAm: String, titel
     job.setJobName(titel)
 
     val druck = Tagesblattdruck(blatt, standort, gedrucktAm)
-    // Querformat: sieben Spalten mit Name, Tischen und Telefonnummer werden auf
-    // Hochkant zu eng, und das Blatt wird sowieso quer abgelegt.
-    val format = job.defaultPage().apply { orientation = PageFormat.LANDSCAPE }
+    // Hochformat wie das Blatt auf dem Pi. Die sieben Spalten werden dadurch
+    // enger, passen aber - lange Namen bekommen ein Auslassungszeichen.
+    val format = job.defaultPage().apply { orientation = PageFormat.PORTRAIT }
     job.setPrintable(druck, format)
 
     if (!job.printDialog()) return true
