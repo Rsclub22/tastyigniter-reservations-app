@@ -62,7 +62,8 @@ class InternApiTest {
         assertEquals(35, elf.paxBelegt)
         assertEquals(120, elf.paxMax)
         assertTrue(elf.passt)
-        assertEquals("35/120 Plätze", elf.anzeige)
+        assertEquals("35/120 Pers.", elf.anzeige)
+        assertFalse(elf.knapp)
 
         // Der Sperrvermerk selbst ist keine Gesellschaft und zaehlt nicht mit.
         assertEquals(10, tag.gaesteGesamt)
@@ -85,7 +86,8 @@ class InternApiTest {
         val fenster = tag.belegung.single()
         assertNull(fenster.paxMax)
         assertFalse(fenster.ohneTisch)
-        assertEquals("6/8 Tische", fenster.anzeige)
+        assertEquals("6/8 Tische · max. 10 Pl.", fenster.anzeige)
+        assertFalse(fenster.knapp)
         assertEquals(8, tag.tischeGesamt)
         assertEquals(44, tag.plaetzeGesamt)
         assertEquals(4, tag.raeume.size)

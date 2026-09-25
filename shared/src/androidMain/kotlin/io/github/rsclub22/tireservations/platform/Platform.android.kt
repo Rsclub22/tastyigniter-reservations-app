@@ -4,8 +4,16 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.app.Activity
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.print.PrintAttributes
+import android.print.PrintManager
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import java.io.File
+import java.lang.ref.WeakReference
 
 /**
  * Der Anwendungskontext. Wird in `ReservationsApp.onCreate` gesetzt, bevor irgendetwas
@@ -24,6 +32,19 @@ internal lateinit var appContext: Context
  */
 fun initAndroidPlatform(context: Context) {
     appContext = context.applicationContext
+}
+
+/**
+ * Die gerade sichtbare Activity.
+ *
+ * Nur fuers Drucken: PrintManager zeigt eine Oberflaeche und verlangt deshalb eine
+ * Activity, der Anwendungskontext genuegt ihm nicht. Als WeakReference gehalten,
+ * damit eine beendete Activity nicht am Leben bleibt.
+ */
+private var aktiveActivity: WeakReference<Activity>? = null
+
+fun setzeAktiveActivity(activity: Activity?) {
+    aktiveActivity = activity?.let { WeakReference(it) }
 }
 
 actual val deviceName: String
@@ -66,4 +87,33 @@ private fun start(intent: Intent): Boolean = try {
     true
 } catch (_: ActivityNotFoundException) {
     false
+}
+
+/**
+ * Druckt ueber die Systemfunktion von Android: eine WebView laedt das Blatt, der
+ * PrintManager macht daraus ein Dokument mit Vorschau und Druckerauswahl.
+ *
+ * Laeuft auf dem Hauptfaden - WebView laesst sich nirgendwo sonst erzeugen - und
+ * braucht eine Activity, siehe [setzeAktiveActivity].
+ */
+actual fun drucke(html: String, titel: String): Boolean {
+    val activity = aktiveActivity?.get() ?: return false
+
+    Handler(Looper.getMainLooper()).post {
+        val web = WebView(activity)
+        web.webViewClient = object : WebViewClient() {
+            override fun onPageFinished(view: WebView, url: String?) {
+                val dienst = activity.getSystemService(Context.PRINT_SERVICE) as? PrintManager ?: return
+                dienst.print(
+                    titel,
+                    view.createPrintDocumentAdapter(titel),
+                    PrintAttributes.Builder().build(),
+                )
+            }
+        }
+        // Ohne Basis-URL: das Blatt ist in sich geschlossen, es wird nichts nachgeladen.
+        web.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+    }
+
+    return true
 }

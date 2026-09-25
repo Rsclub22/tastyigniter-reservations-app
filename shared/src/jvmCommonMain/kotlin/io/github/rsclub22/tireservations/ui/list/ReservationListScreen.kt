@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Print
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.material3.rememberDrawerState
@@ -99,6 +100,7 @@ fun ReservationListScreen(
     onCreate: (LocalDate) -> Unit,
     onAnnahme: () -> Unit,
     onMonat: () -> Unit,
+    onBlatt: () -> Unit,
     onSettings: () -> Unit,
     onUnauthorized: () -> Unit,
 ) {
@@ -146,6 +148,16 @@ fun ReservationListScreen(
                     onClick = {
                         bereich.launch { schublade.close() }
                         onMonat()
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                NavigationDrawerItem(
+                    label = { Text("Tagesblatt drucken") },
+                    icon = { Icon(Icons.Outlined.Print, contentDescription = null) },
+                    selected = false,
+                    onClick = {
+                        bereich.launch { schublade.close() }
+                        onBlatt()
                     },
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )

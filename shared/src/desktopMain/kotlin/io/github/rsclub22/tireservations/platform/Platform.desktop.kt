@@ -67,3 +67,20 @@ private fun browse(uri: URI): Boolean = runCatching {
  */
 private fun encode(text: String): String =
     URLEncoder.encode(text, "UTF-8").replace("+", "%20")
+
+/**
+ * Schreibt das Blatt in eine Datei und oeffnet sie im Browser - von dort geht es
+ * mit Strg+P auf den Drucker.
+ *
+ * Bewusst nicht Desktop.print(): das schickt die Datei ohne Vorschau und ohne
+ * Auswahl des Druckers direkt an den Standarddrucker. Beim Tagesblatt will man
+ * vorher sehen, was kommt, und oft nur einen der Abschnitte.
+ */
+actual fun drucke(html: String, titel: String): Boolean = runCatching {
+    val name = titel.replace(Regex("[^A-Za-z0-9_-]"), "-").take(40).ifBlank { "tagesblatt" }
+    val datei = File.createTempFile("$name-", ".html")
+    datei.deleteOnExit()
+    datei.writeText(html, Charsets.UTF_8)
+
+    browse(datei.toURI())
+}.getOrDefault(false)

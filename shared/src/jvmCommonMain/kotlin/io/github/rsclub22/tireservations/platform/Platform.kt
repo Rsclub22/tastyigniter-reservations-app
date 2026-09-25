@@ -28,3 +28,12 @@ expect fun composeMail(address: String, subject: String): Boolean
 
 /** Öffnet eine Adresse im Browser. Gibt false zurück, wenn keiner gefunden wurde. */
 expect fun openUrl(url: String): Boolean
+
+/**
+ * Gibt ein druckfertiges HTML aus - auf dem Desktop im Browser, am Telefon ueber
+ * die Druckfunktion des Systems. In beiden Faellen bekommt man eine Vorschau,
+ * bevor Papier verbraucht wird.
+ *
+ * @return false, wenn dafuer nichts eingerichtet ist.
+ */
+expect fun drucke(html: String, titel: String): Boolean

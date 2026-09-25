@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import io.github.rsclub22.tireservations.platform.setzeAktiveActivity
 import io.github.rsclub22.tireservations.ui.AppNavigation
 import io.github.rsclub22.tireservations.ui.components.MeldungsHost
 import io.github.rsclub22.tireservations.ui.theme.ReservationsTheme
@@ -17,6 +18,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Das Drucken braucht eine Activity, nicht den Anwendungskontext.
+        setzeAktiveActivity(this)
         val app = application as ReservationsApp
         setContent {
             ReservationsTheme {
@@ -39,5 +42,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        setzeAktiveActivity(null)
+        super.onDestroy()
     }
 }

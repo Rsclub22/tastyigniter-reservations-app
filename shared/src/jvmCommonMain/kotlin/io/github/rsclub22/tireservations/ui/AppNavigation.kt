@@ -19,6 +19,7 @@ import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.data.UpdateChecker
 import io.github.rsclub22.tireservations.ui.components.LoadingBox
 import io.github.rsclub22.tireservations.ui.annahme.TelefonannahmeScreen
+import io.github.rsclub22.tireservations.ui.blatt.TagesblattScreen
 import io.github.rsclub22.tireservations.ui.monat.MonatsansichtScreen
 import io.github.rsclub22.tireservations.ui.detail.ReservationDetailScreen
 import io.github.rsclub22.tireservations.ui.edit.ReservationEditScreen
@@ -36,6 +37,7 @@ private object Routes {
     const val EDIT = "edit?id={id}&date={date}"
     const val ANNAHME = "annahme?datum={datum}"
     const val MONAT = "monat"
+    const val BLATT = "blatt"
     const val SETTINGS = "settings"
 
     fun detail(id: Long) = "detail/$id"
@@ -95,6 +97,7 @@ private fun AppNavHost(
                 onCreate = { nav.navigate(Routes.edit(date = it)) },
                 onAnnahme = { nav.navigate(Routes.annahme()) },
                 onMonat = { nav.navigate(Routes.MONAT) },
+                onBlatt = { nav.navigate(Routes.BLATT) },
                 onSettings = { nav.navigate(Routes.SETTINGS) },
                 onUnauthorized = toLogin,
             )
@@ -110,6 +113,13 @@ private fun AppNavHost(
                 onBack = { nav.popBackStack() },
                 onUnauthorized = toLogin,
                 startdatum = datum ?: LocalDate.now(),
+            )
+        }
+        composable(Routes.BLATT) {
+            TagesblattScreen(
+                repository = repository,
+                onBack = { nav.popBackStack() },
+                onUnauthorized = toLogin,
             )
         }
         composable(Routes.MONAT) {

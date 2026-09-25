@@ -42,13 +42,25 @@ data class Zeitfenster(
     val paxMax: Int?,
     val paxBelegt: Int,
 ) {
-    /** Kurzform für die Anzeige: „3/8 Tische", „35/120 Plätze" oder „belegt". */
+    /**
+     * Die Zeile unter der Uhrzeit, wortgleich mit der internen Weboberflaeche -
+     * die Formulierungen sind im Haus eingefuehrt, und zwei verschiedene waeren
+     * eine Stolperfalle beim Umstieg.
+     */
     val anzeige: String
         get() = when {
-            paxMax != null -> "$paxBelegt/$paxMax Plätze"
-            raum != null -> if (frei > 0) "frei" else "belegt"
-            else -> "$frei/$gesamt Tische"
+            paxMax != null -> "$paxBelegt/$paxMax Pers." + if (!passt) " · voll" else ""
+            !passt -> "belegt"
+            ohneTisch -> "ohne Tisch"
+            raum != null -> "$raum frei"
+            else -> "$frei/$gesamt Tische · max. $groesster Pl."
         }
+
+    /**
+     * Nur noch ein oder zwei Tische frei. Die Weboberflaeche setzt dafuer eine
+     * farbige Kante - „wird knapp", nicht „geht nicht mehr".
+     */
+    val knapp: Boolean get() = frei in 1..2 && paxMax == null
 }
 
 /** Scheune, Keller, Saal, Gaststube - von Hand vergeben, hängen nicht an den Tischen. */
