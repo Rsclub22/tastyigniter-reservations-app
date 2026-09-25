@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Event
 import androidx.compose.material.icons.outlined.Group
+import androidx.compose.material.icons.automirrored.outlined.PhoneForwarded
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.TableRestaurant
@@ -244,12 +245,20 @@ fun ReservationDetailScreen(
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         InfoRow(Icons.Outlined.Call, r.telephone.ifBlank { "–" })
                         InfoRow(Icons.Outlined.Email, r.email.ifBlank { "–" })
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
                             if (r.telephone.isNotBlank()) {
                                 FilledTonalButton(onClick = { context.dial(r.telephone) }) {
                                     Icon(Icons.Outlined.Call, contentDescription = null, modifier = Modifier.size(18.dp))
                                     Spacer(Modifier.width(8.dp))
                                     Text("Anrufen")
+                                }
+                                OutlinedButton(onClick = { context.dialWithChooser(r.telephone) }) {
+                                    Icon(Icons.AutoMirrored.Outlined.PhoneForwarded, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Anrufen mit …")
                                 }
                             }
                             if (r.email.isNotBlank()) {
@@ -354,8 +363,14 @@ private fun InfoRow(icon: ImageVector, text: String) {
     }
 }
 
-private fun Context.dial(phone: String) =
-    launch(Intent(Intent.ACTION_DIAL, "tel:${Uri.encode(phone)}".toUri()))
+private fun dialIntent(phone: String) = Intent(Intent.ACTION_DIAL, "tel:${Uri.encode(phone)}".toUri())
+
+/** Opens the default phone app (or Android's picker if no default is set). */
+private fun Context.dial(phone: String) = launch(dialIntent(phone))
+
+/** Always asks which app should place the call, e.g. the phone app or a softphone like 3CX. */
+private fun Context.dialWithChooser(phone: String) =
+    launch(Intent.createChooser(dialIntent(phone), "Anrufen mit …"))
 
 private fun Context.email(address: String, r: Reservation) = launch(
     Intent(Intent.ACTION_SENDTO, "mailto:".toUri()).apply {

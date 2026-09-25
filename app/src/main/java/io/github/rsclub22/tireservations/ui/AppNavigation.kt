@@ -15,6 +15,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.SettingsStore
+import io.github.rsclub22.tireservations.data.UpdateChecker
 import io.github.rsclub22.tireservations.ui.components.LoadingBox
 import io.github.rsclub22.tireservations.ui.detail.ReservationDetailScreen
 import io.github.rsclub22.tireservations.ui.edit.ReservationEditScreen
@@ -37,7 +38,7 @@ private object Routes {
 }
 
 @Composable
-fun AppNavigation(repository: ReservationRepository, settingsStore: SettingsStore) {
+fun AppNavigation(repository: ReservationRepository, settingsStore: SettingsStore, updateChecker: UpdateChecker) {
     // Decided once from the stored settings; afterwards navigation handles login/logout.
     var start by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
@@ -46,7 +47,7 @@ fun AppNavigation(repository: ReservationRepository, settingsStore: SettingsStor
 
     when (val destination = start) {
         null -> LoadingBox()
-        else -> AppNavHost(repository, settingsStore, destination)
+        else -> AppNavHost(repository, settingsStore, updateChecker, destination)
     }
 }
 
@@ -54,6 +55,7 @@ fun AppNavigation(repository: ReservationRepository, settingsStore: SettingsStor
 private fun AppNavHost(
     repository: ReservationRepository,
     settingsStore: SettingsStore,
+    updateChecker: UpdateChecker,
     startDestination: String,
     nav: NavHostController = rememberNavController(),
 ) {
@@ -122,6 +124,7 @@ private fun AppNavHost(
             SettingsScreen(
                 repository = repository,
                 settingsStore = settingsStore,
+                updateChecker = updateChecker,
                 onBack = { nav.popBackStack() },
                 onLoggedOut = {
                     nav.navigate(Routes.LOGIN) { popUpTo(nav.graph.id) { inclusive = true } }

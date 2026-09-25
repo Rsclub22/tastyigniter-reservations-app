@@ -18,6 +18,10 @@ android {
         targetSdk = 36
         versionCode = (System.getenv("VERSION_CODE") ?: "1").toInt()
         versionName = System.getenv("VERSION_NAME") ?: "1.0.0"
+
+        // GitHub repository whose releases the app checks for updates ("" disables the check,
+        // e.g. for a Play Store only build). Play Store installs never check GitHub.
+        buildConfigField("String", "UPDATE_REPO", "\"Rsclub22/tastyigniter-reservations-app\"")
     }
 
     signingConfigs {

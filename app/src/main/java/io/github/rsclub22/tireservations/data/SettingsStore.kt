@@ -17,6 +17,8 @@ data class AppSettings(
     val token: String? = null,
     val userName: String? = null,
     val defaultLocationId: Long? = null,
+    /** Update the user chose "Später" for; not offered again automatically. */
+    val skippedUpdateVersion: String? = null,
 ) {
     val isLoggedIn: Boolean get() = !token.isNullOrBlank() && baseUrl.isNotBlank()
 }
@@ -32,6 +34,7 @@ class SettingsStore(private val context: Context) {
         val token = stringPreferencesKey("token")
         val userName = stringPreferencesKey("user_name")
         val defaultLocation = longPreferencesKey("default_location")
+        val skippedUpdate = stringPreferencesKey("skipped_update")
     }
 
     val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
@@ -43,6 +46,7 @@ class SettingsStore(private val context: Context) {
         token = this[Keys.token],
         userName = this[Keys.userName],
         defaultLocationId = this[Keys.defaultLocation],
+        skippedUpdateVersion = this[Keys.skippedUpdate],
     )
 
     suspend fun saveLogin(baseUrl: String, email: String, isAdmin: Boolean, token: String, userName: String?) {
@@ -59,6 +63,10 @@ class SettingsStore(private val context: Context) {
         context.dataStore.edit {
             if (id != null) it[Keys.defaultLocation] = id else it.remove(Keys.defaultLocation)
         }
+    }
+
+    suspend fun skipUpdate(version: String) {
+        context.dataStore.edit { it[Keys.skippedUpdate] = version }
     }
 
     suspend fun logout() {
