@@ -43,8 +43,9 @@ Verwendete Endpunkte:
 | Status ändern | `PATCH /api/reservations/{id}/status` |
 | Stammdaten | `GET /api/locations`, `/api/tables`, `/api/status` |
 
-> Hinweis: Die API verlangt beim Anlegen **Vorname, Nachname, E-Mail und Telefon**. Für Gäste ohne
-> E-Mail-Adresse muss eine Platzhalter-Adresse eingetragen werden.
+> Hinweis: Pflichtfelder beim Anlegen sind **Vorname, Nachname und Telefon**. Die E-Mail-Adresse ist
+> optional und wird ohne Eingabe gar nicht erst mitgeschickt. Verlangt eine Installation sie doch, zeigt
+> die App die Fehlermeldung des Servers am Feld an.
 
 ## Installation
 

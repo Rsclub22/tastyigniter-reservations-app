@@ -113,6 +113,21 @@ class TastyIgniterApiTest {
     }
 
     @Test
+    fun `omits blank email on create but sends it on update`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(201).setBody(MappersTest.SAMPLE_LIST))
+        server.enqueue(MockResponse().setBody(MappersTest.SAMPLE_LIST))
+        val draft = ReservationDraft(locationId = 1, firstName = "Max", lastName = "Muster", telephone = "0151", email = " ")
+
+        api().createReservation(draft)
+        api().updateReservation(12, draft)
+
+        val created = Json.parseToJsonElement(server.takeRequest().body.readUtf8()) as JsonObject
+        assertTrue("email" !in created)
+        val updated = Json.parseToJsonElement(server.takeRequest().body.readUtf8()) as JsonObject
+        assertEquals("", updated["email"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun `updates status via dedicated endpoint`() = runTest {
         server.enqueue(MockResponse().setBody(MappersTest.SAMPLE_LIST))
 

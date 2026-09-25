@@ -21,9 +21,14 @@ class ReservationValidationTest {
     fun `reports missing required fields`() {
         val errors = ReservationEditViewModel.validate(ReservationDraft(guestNum = 0))
         assertEquals(
-            setOf("location_id", "guest_num", "first_name", "last_name", "email", "telephone"),
+            setOf("location_id", "guest_num", "first_name", "last_name", "telephone"),
             errors.keys,
         )
+    }
+
+    @Test
+    fun `email is optional`() {
+        assertTrue(ReservationEditViewModel.validate(valid.copy(email = "")).isEmpty())
     }
 
     @Test

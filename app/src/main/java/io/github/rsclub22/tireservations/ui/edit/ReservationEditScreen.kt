@@ -188,7 +188,7 @@ fun ReservationEditScreen(
             FormField("Telefon", d.telephone, err["telephone"], Modifier.fillMaxWidth(), keyboardType = KeyboardType.Phone) { v ->
                 vm.edit { it.copy(telephone = v) }
             }
-            FormField("E-Mail", d.email, err["email"], Modifier.fillMaxWidth(), keyboardType = KeyboardType.Email) { v ->
+            FormField("E-Mail (optional)", d.email, err["email"], Modifier.fillMaxWidth(), keyboardType = KeyboardType.Email) { v ->
                 vm.edit { it.copy(email = v) }
             }
             OutlinedTextField(

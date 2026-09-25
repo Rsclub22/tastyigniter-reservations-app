@@ -101,13 +101,13 @@ class TastyIgniterApi(
     }
 
     suspend fun createReservation(draft: ReservationDraft): Long {
-        val doc = document(send("POST", url("reservations"), draft.toJson()))
+        val doc = document(send("POST", url("reservations"), draft.toJson(isUpdate = false)))
         val res = doc.data.firstOrNull() ?: throw ApiException(0, "Unerwartete Antwort vom Server.")
         return Mappers.reservation(doc, res).id
     }
 
     suspend fun updateReservation(id: Long, draft: ReservationDraft) {
-        send("PATCH", url("reservations/$id"), draft.toJson())
+        send("PATCH", url("reservations/$id"), draft.toJson(isUpdate = true))
     }
 
     suspend fun deleteReservation(id: Long) {
@@ -202,14 +202,18 @@ class TastyIgniterApi(
         return ApiException(code, message, fieldErrors)
     }
 
-    private fun ReservationDraft.toJson(): JsonObject = buildJsonObject {
+    /**
+     * A blank e-mail is left out when creating, so installations without the e-mail requirement
+     * accept it. When updating it is sent empty, so a removed address is actually cleared.
+     */
+    private fun ReservationDraft.toJson(isUpdate: Boolean): JsonObject = buildJsonObject {
         put("location_id", locationId)
         put("reserve_date", date.format(ISO_DATE))
         put("reserve_time", time.format(TIME))
         put("guest_num", guestNum)
         put("first_name", firstName.trim())
         put("last_name", lastName.trim())
-        put("email", email.trim())
+        if (email.isNotBlank() || isUpdate) put("email", email.trim())
         put("telephone", telephone.trim())
         put("comment", comment.trim())
         duration?.let { put("duration", it) }

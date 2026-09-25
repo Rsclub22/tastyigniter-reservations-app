@@ -138,7 +138,8 @@ class ReservationEditViewModel(
             if (d.firstName.trim().length > 48) put("first_name", "Maximal 48 Zeichen.")
             if (d.lastName.isBlank()) put("last_name", "Nachname fehlt.")
             if (d.lastName.trim().length > 48) put("last_name", "Maximal 48 Zeichen.")
-            if (!EMAIL.matches(d.email.trim())) put("email", "Gültige E-Mail-Adresse erforderlich.")
+            // E-mail is optional (not every installation requires it), but must be valid if given.
+            if (d.email.isNotBlank() && !EMAIL.matches(d.email.trim())) put("email", "Keine gültige E-Mail-Adresse.")
             if (d.email.trim().length > 96) put("email", "Maximal 96 Zeichen.")
             if (d.telephone.isBlank()) put("telephone", "Telefonnummer fehlt.")
             if (d.comment.length > 520) put("comment", "Maximal 520 Zeichen.")
