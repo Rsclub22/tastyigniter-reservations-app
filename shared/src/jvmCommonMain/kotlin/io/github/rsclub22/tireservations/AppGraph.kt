@@ -38,6 +38,16 @@ object AppGraph {
     /** Die automatische Update-Prüfung läuft einmal je App-Start. */
     var updateCheckedThisSession = false
 
+    /**
+     * War der gespeicherte Stand beim Start unlesbar und musste verworfen werden?
+     *
+     * Dann ist die Anwendung abgemeldet, ohne dass jemand sich abgemeldet hat -
+     * das gehoert gesagt, sonst sucht man den Fehler beim Server oder beim
+     * eigenen Passwort.
+     */
+    var einstellungenVerloren = false
+        private set
+
     private var initialised = false
 
     /** Stehen die Abhaengigkeiten schon? Fuer Aufrufer ausserhalb der Oberflaeche. */
@@ -74,7 +84,7 @@ object AppGraph {
             }
             .build()
 
-        settingsStore = SettingsStore(createSettingsDataStore())
+        settingsStore = SettingsStore(createSettingsDataStore { einstellungenVerloren = true })
         repository = ReservationRepository(settingsStore, httpClient)
         wachdienst = Wachdienst(repository, settingsStore)
         updateChecker = UpdateChecker(

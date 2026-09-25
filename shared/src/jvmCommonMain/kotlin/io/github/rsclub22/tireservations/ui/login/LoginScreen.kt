@@ -23,6 +23,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -45,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.rsclub22.tireservations.data.ReservationRepository
+import io.github.rsclub22.tireservations.AppGraph
 import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.ui.components.ErrorCard
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -140,6 +143,24 @@ fun LoginScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+
+            // Abgemeldet, ohne dass sich jemand abgemeldet hat: dann sucht man den
+            // Fehler sonst beim Server oder beim eigenen Passwort.
+            if (AppGraph.einstellungenVerloren) {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                    ),
+                ) {
+                    Text(
+                        "Die gespeicherten Einstellungen waren unlesbar und wurden verworfen – " +
+                            "deshalb ist hier alles leer. Einmal neu anmelden genügt.",
+                        Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                }
+            }
 
             val fieldModifier = Modifier.fillMaxWidth().widthIn(max = 480.dp)
             OutlinedTextField(
