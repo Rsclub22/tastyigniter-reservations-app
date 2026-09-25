@@ -214,7 +214,77 @@ class InternApiTest {
         assertEquals("DELETE", server.takeRequest().method)
     }
 
+    @Test
+    fun `liest die Monatsuebersicht samt leerer Tage`() = runTest {
+        server.enqueue(MockResponse().setBody(MONAT))
+
+        val monat = api().internMonat(2026, 12)
+
+        assertEquals(2026, monat.jahr)
+        assertEquals(12, monat.monat)
+        // Alle Tage des Monats, auch die leeren - sonst bekaeme das Raster Luecken.
+        assertEquals(31, monat.tage.size)
+        assertEquals(65, monat.hoechstwert)
+        assertEquals(61 + 65, monat.gaesteGesamt)
+
+        val weihnachten = monat.tag(LocalDate.of(2026, 12, 25))!!
+        assertEquals(61, weihnachten.gaeste)
+        assertTrue(weihnachten.vermerk)
+        assertEquals(120, weihnachten.maxPax)
+        assertFalse(weihnachten.leer)
+
+        val gesperrt = monat.tag(LocalDate.of(2026, 12, 24))!!
+        assertTrue(gesperrt.gesperrt)
+        assertEquals("Heiligabend", gesperrt.grund)
+        // Ein gesperrter Tag ist nicht "leer", auch ohne Gaeste - sonst faellt er
+        // im Kalender nicht auf.
+        assertFalse(gesperrt.leer)
+
+        val still = monat.tag(LocalDate.of(2026, 12, 1))!!
+        assertTrue(still.leer)
+        assertEquals(0f, monat.fuellung(still))
+        assertEquals(1f, monat.fuellung(monat.tag(LocalDate.of(2026, 12, 26))!!))
+
+        assertEquals("/api/intern/monat?jahr=2026&monat=12", server.takeRequest().path)
+    }
+
     private companion object {
+        val MONAT = """
+{"jahr":2026,"monat":12,"von":"2026-12-01","bis":"2026-12-31","hoechstwert":65,"tage":[
+  {"datum":"2026-12-01","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-02","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-03","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-04","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-05","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-06","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-07","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-08","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-09","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-10","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-11","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-12","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-13","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-14","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-15","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-16","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-17","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-18","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-19","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-20","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-21","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-22","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-23","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-24","reservierungen":0,"gaeste":0,"gesperrt":true,"grund":"Heiligabend","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-25","reservierungen":8,"gaeste":61,"gesperrt":false,"grund":"","vermerk":true,"vermerk_text":"WEIHNACHTEN: MAX 120 PAX.","max_pax":120},
+  {"datum":"2026-12-26","reservierungen":9,"gaeste":65,"gesperrt":false,"grund":"","vermerk":true,"vermerk_text":"WEIHNACHTEN: MAX 120 PAX.","max_pax":120},
+  {"datum":"2026-12-27","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-28","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-29","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-30","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null},
+  {"datum":"2026-12-31","reservierungen":0,"gaeste":0,"gesperrt":false,"grund":"","vermerk":false,"vermerk_text":"","max_pax":null}
+]}
+        """.trimIndent()
+
         val WEIHNACHTEN = """
             {
               "datum":"2026-12-25","gaeste":4,"raum":null,

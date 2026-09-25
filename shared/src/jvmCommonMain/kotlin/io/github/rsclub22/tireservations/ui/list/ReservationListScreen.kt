@@ -19,6 +19,17 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.automirrored.outlined.PhoneForwarded
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -87,16 +98,71 @@ fun ReservationListScreen(
     onOpen: (Long) -> Unit,
     onCreate: (LocalDate) -> Unit,
     onAnnahme: () -> Unit,
+    onMonat: () -> Unit,
     onSettings: () -> Unit,
     onUnauthorized: () -> Unit,
 ) {
     val vm: ReservationListViewModel = viewModel { ReservationListViewModel(repository, settingsStore) }
     val state by vm.state.collectAsStateWithLifecycle()
     var showDatePicker by remember { mutableStateOf(false) }
+    var plusMenue by remember { mutableStateOf(false) }
+    val schublade = rememberDrawerState(DrawerValue.Closed)
+    val bereich = rememberCoroutineScope()
     // Returning from detail/edit screens re-enters composition: refresh the list then.
     LaunchedEffect(Unit) { vm.onScreenShown() }
     LaunchedEffect(state.unauthorized) { if (state.unauthorized) onUnauthorized() }
 
+    ModalNavigationDrawer(
+        drawerState = schublade,
+        drawerContent = {
+            ModalDrawerSheet {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Reservierungen",
+                    Modifier.padding(horizontal = 28.dp, vertical = 16.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                NavigationDrawerItem(
+                    label = { Text("Tagesliste") },
+                    icon = { Icon(Icons.Outlined.Event, contentDescription = null) },
+                    selected = true,
+                    onClick = { bereich.launch { schublade.close() } },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                NavigationDrawerItem(
+                    label = { Text("Telefonannahme") },
+                    icon = { Icon(Icons.AutoMirrored.Outlined.PhoneForwarded, contentDescription = null) },
+                    selected = false,
+                    onClick = {
+                        bereich.launch { schublade.close() }
+                        onAnnahme()
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                NavigationDrawerItem(
+                    label = { Text("Monatsübersicht") },
+                    icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
+                    selected = false,
+                    onClick = {
+                        bereich.launch { schublade.close() }
+                        onMonat()
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                NavigationDrawerItem(
+                    label = { Text("Einstellungen") },
+                    icon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+                    selected = false,
+                    onClick = {
+                        bereich.launch { schublade.close() }
+                        onSettings()
+                    },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+            }
+        },
+    ) {
     Scaffold(
         topBar = {
             if (state.searchActive) {
@@ -130,6 +196,11 @@ fun ReservationListScreen(
             } else {
                 TopAppBar(
                     title = { Text("Reservierungen") },
+                    navigationIcon = {
+                        IconButton(onClick = { bereich.launch { schublade.open() } }) {
+                            Icon(Icons.Filled.Menu, contentDescription = "Menü")
+                        }
+                    },
                     actions = {
                         IconButton(onClick = { vm.setSearchActive(true) }) {
                             Icon(Icons.Outlined.Search, contentDescription = "Suchen")
@@ -148,11 +219,36 @@ fun ReservationListScreen(
             }
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { onCreate(state.date) },
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Neue Reservierung") },
-            )
+            // Zwei Wege hinter einem Knopf: am Telefon zaehlt Tempo, beim Nacharbeiten
+            // die Vollstaendigkeit. Das Menue oeffnet sich ueber dem Knopf, damit der
+            // Daumen nicht wandern muss.
+            Box {
+                DropdownMenu(expanded = plusMenue, onDismissRequest = { plusMenue = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Schnelle Annahme") },
+                        leadingIcon = {
+                            Icon(Icons.AutoMirrored.Outlined.PhoneForwarded, contentDescription = null)
+                        },
+                        onClick = {
+                            plusMenue = false
+                            onAnnahme()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Vollständige Reservierung") },
+                        leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                        onClick = {
+                            plusMenue = false
+                            onCreate(state.date)
+                        },
+                    )
+                }
+                ExtendedFloatingActionButton(
+                    onClick = { plusMenue = true },
+                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                    text = { Text("Neu") },
+                )
+            }
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
@@ -217,6 +313,7 @@ fun ReservationListScreen(
             },
             dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Abbrechen") } },
         ) { DatePicker(state = pickerState) }
+    }
     }
 }
 

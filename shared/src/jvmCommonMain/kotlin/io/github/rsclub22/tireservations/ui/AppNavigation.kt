@@ -19,6 +19,7 @@ import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.data.UpdateChecker
 import io.github.rsclub22.tireservations.ui.components.LoadingBox
 import io.github.rsclub22.tireservations.ui.annahme.TelefonannahmeScreen
+import io.github.rsclub22.tireservations.ui.monat.MonatsansichtScreen
 import io.github.rsclub22.tireservations.ui.detail.ReservationDetailScreen
 import io.github.rsclub22.tireservations.ui.edit.ReservationEditScreen
 import io.github.rsclub22.tireservations.ui.list.ReservationListScreen
@@ -33,10 +34,12 @@ private object Routes {
     const val LIST = "list"
     const val DETAIL = "detail/{id}"
     const val EDIT = "edit?id={id}&date={date}"
-    const val ANNAHME = "annahme"
+    const val ANNAHME = "annahme?datum={datum}"
+    const val MONAT = "monat"
     const val SETTINGS = "settings"
 
     fun detail(id: Long) = "detail/$id"
+    fun annahme(datum: LocalDate? = null) = "annahme?datum=${datum ?: ""}"
     fun edit(id: Long? = null, date: LocalDate? = null) = "edit?id=${id ?: -1}&date=${date ?: ""}"
 }
 
@@ -90,15 +93,30 @@ private fun AppNavHost(
                 settingsStore = settingsStore,
                 onOpen = { nav.navigate(Routes.detail(it)) },
                 onCreate = { nav.navigate(Routes.edit(date = it)) },
-                onAnnahme = { nav.navigate(Routes.ANNAHME) },
+                onAnnahme = { nav.navigate(Routes.annahme()) },
+                onMonat = { nav.navigate(Routes.MONAT) },
                 onSettings = { nav.navigate(Routes.SETTINGS) },
                 onUnauthorized = toLogin,
             )
         }
-        composable(Routes.ANNAHME) {
+        composable(
+            Routes.ANNAHME,
+            arguments = listOf(navArgument("datum") { type = NavType.StringType; defaultValue = "" }),
+        ) { entry ->
+            val datum = entry.arguments?.read { getStringOrNull("datum") }?.takeIf { it.isNotBlank() }
+                ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
             TelefonannahmeScreen(
                 repository = repository,
                 onBack = { nav.popBackStack() },
+                onUnauthorized = toLogin,
+                startdatum = datum ?: LocalDate.now(),
+            )
+        }
+        composable(Routes.MONAT) {
+            MonatsansichtScreen(
+                repository = repository,
+                onBack = { nav.popBackStack() },
+                onTagOeffnen = { nav.navigate(Routes.annahme(it)) },
                 onUnauthorized = toLogin,
             )
         }

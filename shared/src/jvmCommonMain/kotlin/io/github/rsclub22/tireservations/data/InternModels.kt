@@ -156,6 +156,49 @@ data class Blatt(
     val reservierungen: List<InternReservierung>,
 )
 
+/** Ein Tag in der Monatsuebersicht - nur Summen, keine Zeitfenster. */
+data class Monatstag(
+    val datum: LocalDate,
+    val reservierungen: Int,
+    val gaeste: Int,
+    val gesperrt: Boolean,
+    val grund: String,
+    val vermerk: Boolean,
+    val vermerkText: String,
+    val maxPax: Int?,
+) {
+    val leer: Boolean get() = reservierungen == 0 && !gesperrt && !vermerk
+}
+
+/**
+ * Der Monat auf einen Blick - `GET intern/monat`.
+ *
+ * Enthaelt jeden Tag des Monats, auch die leeren, damit das Kalenderraster ohne
+ * Luecken gezeichnet werden kann.
+ */
+data class Monatsuebersicht(
+    val jahr: Int,
+    val monat: Int,
+    val von: LocalDate,
+    val bis: LocalDate,
+    /**
+     * Groesste Gaestezahl des Monats. Eingefaerbt wird daran und nicht an einer
+     * festen Kapazitaet: die Raeume fassen ein Vielfaches der Tische, eine feste
+     * Obergrenze waere an den meisten Tagen irrefuehrend.
+     */
+    val hoechstwert: Int,
+    val tage: List<Monatstag>,
+) {
+    fun tag(datum: LocalDate): Monatstag? = tage.firstOrNull { it.datum == datum }
+
+    /** Wie voll der Tag im Vergleich zum vollsten des Monats ist, 0f..1f. */
+    fun fuellung(tag: Monatstag): Float =
+        if (hoechstwert <= 0) 0f else (tag.gaeste.toFloat() / hoechstwert).coerceIn(0f, 1f)
+
+    val gaesteGesamt: Int get() = tage.sumOf { it.gaeste }
+    val reservierungenGesamt: Int get() = tage.sumOf { it.reservierungen }
+}
+
 /**
  * Wandelt die Antworten um. Von Hand wie im übrigen Datenlayer, damit ein
  * fehlendes oder unerwartetes Feld eine harmlose Vorgabe ergibt und nicht die
@@ -181,6 +224,26 @@ internal object InternMappers {
         paxJeZeit = zahlmap(o["pax_je_zeit"]),
         hausgroesse = o.int("hausgroesse") ?: 0,
         reservierungen = objekte(o["reservierungen"]).map(::reservierung),
+    )
+
+    fun monat(o: JsonObject): Monatsuebersicht = Monatsuebersicht(
+        jahr = o.int("jahr") ?: LocalDate.now().year,
+        monat = o.int("monat") ?: LocalDate.now().monthValue,
+        von = datum(o.string("von")) ?: LocalDate.now(),
+        bis = datum(o.string("bis")) ?: LocalDate.now(),
+        hoechstwert = o.int("hoechstwert") ?: 0,
+        tage = objekte(o["tage"]).map(::monatstag),
+    )
+
+    private fun monatstag(o: JsonObject) = Monatstag(
+        datum = datum(o.string("datum")) ?: LocalDate.now(),
+        reservierungen = o.int("reservierungen") ?: 0,
+        gaeste = o.int("gaeste") ?: 0,
+        gesperrt = o.bool("gesperrt") ?: false,
+        grund = o.string("grund").orEmpty(),
+        vermerk = o.bool("vermerk") ?: false,
+        vermerkText = o.string("vermerk_text").orEmpty(),
+        maxPax = o.int("max_pax"),
     )
 
     fun tagesblatt(o: JsonObject): Tagesblatt = Tagesblatt(

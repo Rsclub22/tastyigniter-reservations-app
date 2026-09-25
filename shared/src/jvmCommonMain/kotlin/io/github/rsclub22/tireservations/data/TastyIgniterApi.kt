@@ -262,6 +262,16 @@ class TastyIgniterApi(
         return InternMappers.tagesblatt(objekt(send("GET", url)))
     }
 
+    /** Der Monat auf einen Blick: je Tag nur Summen, keine Zeitfenster. */
+    suspend fun internMonat(jahr: Int, monat: Int): Monatsuebersicht {
+        val url = url("intern/monat").newBuilder()
+            .addQueryParameter("jahr", jahr.toString())
+            .addQueryParameter("monat", monat.toString())
+            .build()
+
+        return InternMappers.monat(objekt(send("GET", url)))
+    }
+
     /** Einen Tag gegen die Online-Buchung sperren. Gibt die neue Liste zurück. */
     suspend fun internSperren(datum: LocalDate, grund: String = ""): Map<String, String> {
         val body = buildJsonObject {

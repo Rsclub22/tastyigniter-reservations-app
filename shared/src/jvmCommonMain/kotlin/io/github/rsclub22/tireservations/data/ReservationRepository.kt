@@ -90,6 +90,8 @@ class ReservationRepository(
     suspend fun internTagesblatt(von: LocalDate, bis: LocalDate = von, trennzeit: String? = null) =
         api().internTagesblatt(von, bis, trennzeit)
 
+    suspend fun internMonat(jahr: Int, monat: Int) = api().internMonat(jahr, monat)
+
     suspend fun internSperren(datum: LocalDate, grund: String = "") = api().internSperren(datum, grund)
 
     suspend fun internFreigeben(datum: LocalDate) = api().internFreigeben(datum)

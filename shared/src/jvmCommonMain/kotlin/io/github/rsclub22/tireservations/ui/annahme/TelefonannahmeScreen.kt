@@ -82,9 +82,13 @@ fun TelefonannahmeScreen(
     repository: ReservationRepository,
     onBack: () -> Unit,
     onUnauthorized: () -> Unit,
+    startdatum: java.time.LocalDate = java.time.LocalDate.now(),
 ) {
-    val vm: TelefonannahmeViewModel = viewModel(key = "telefonannahme") {
-        TelefonannahmeViewModel(repository)
+    // Der Schluessel haengt am Startdatum: kommt man aus dem Monatskalender mit
+    // einem anderen Tag herein, soll der Schirm dort stehen und nicht den
+    // gemerkten Zustand des letzten Aufrufs zeigen.
+    val vm: TelefonannahmeViewModel = viewModel(key = "telefonannahme-${'$'}startdatum") {
+        TelefonannahmeViewModel(repository, startdatum)
     }
     val state by vm.state.collectAsStateWithLifecycle()
     var showDate by remember { mutableStateOf(false) }

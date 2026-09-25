@@ -51,9 +51,10 @@ data class AnnahmeState(
  */
 class TelefonannahmeViewModel(
     private val repository: ReservationRepository,
+    startdatum: LocalDate = LocalDate.now(),
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(AnnahmeState())
+    private val _state = MutableStateFlow(AnnahmeState(datum = startdatum))
     val state = _state.asStateFlow()
 
     private var ladeJob: Job? = null
