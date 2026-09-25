@@ -66,35 +66,69 @@ class TastyIgniterApi(
      *
      * The API's `dateTimeFilter` can't be used: TastyIgniter passes the filter through
      * Spatie's `FiltersScope`, which flattens `{startAt, endAt}` into positional arguments, so the
-     * scope ends up filtering between "now" and "now" and returns nothing. Instead we page through
-     * the list sorted by `reserve_date desc` and stop once a page lies entirely before the wanted day.
+     * scope ends up filtering between "now" and "now" and returns nothing. Instead the list is
+     * sorted by `reserve_date desc`; for a day view a binary search over the pages finds the first
+     * page reaching the wanted day, so even old dates on busy installations need few requests.
+     *
+     * @param maxPages only limits search results (no date); day views always cover the whole day.
      */
     suspend fun reservations(query: ReservationQuery, pageLimit: Int = 100, maxPages: Int = 50): List<Reservation> {
         val result = mutableListOf<Reservation>()
-        var page = 1
-        while (page <= maxPages) {
-            val url = url("reservations").newBuilder()
-                .addQueryParameter("include", "status,tables,location")
-                .addQueryParameter("pageLimit", pageLimit.toString())
-                .addQueryParameter("page", page.toString())
-                .addQueryParameter("sort", "reserve_date desc")
-                .apply {
-                    query.locationId?.let { addQueryParameter("location", it.toString()) }
-                    query.statusId?.let { addQueryParameter("status", it.toString()) }
-                    query.search?.takeIf { it.isNotBlank() }?.let { addQueryParameter("search", it.trim()) }
-                }
-                .build()
-            val doc = document(send("GET", url))
-            val items = doc.data.map { Mappers.reservation(doc, it) }
-            result += items
-            if (doc.currentPage >= doc.totalPages || items.isEmpty()) break
-            val latestOnPage = items.mapNotNull { it.date }.maxOrNull()
-            if (query.date != null && latestOnPage != null && latestOnPage < query.date) break
-            page++
+        val date = query.date
+        if (date == null) {
+            var page = 1
+            while (page <= maxPages) {
+                val current = reservationPage(query, page, pageLimit)
+                result += current.items
+                if (page >= current.totalPages || current.items.isEmpty()) break
+                page++
+            }
+        } else {
+            val pages = mutableMapOf<Int, ReservationPage>()
+            suspend fun load(page: Int) = pages[page] ?: reservationPage(query, page, pageLimit).also { pages[page] = it }
+
+            val total = load(1).totalPages
+            // Oldest date per page is non-increasing: find the first page that reaches the day.
+            var lo = 1
+            var hi = total
+            while (lo < hi) {
+                val mid = (lo + hi) / 2
+                val oldest = load(mid).oldestDate
+                if (oldest == null || oldest <= date) hi = mid else lo = mid + 1
+            }
+            var page = lo
+            while (page <= total) {
+                val current = load(page)
+                result += current.items
+                val oldest = current.oldestDate
+                // Every following page lies entirely before the wanted day.
+                if (oldest == null || oldest < date) break
+                page++
+            }
         }
         return result
-            .filter { query.date == null || it.date == query.date }
+            .filter { date == null || it.date == date }
             .sortedWith(compareBy(nullsLast()) { r: Reservation -> r.date }.thenBy(nullsLast()) { it.time })
+    }
+
+    private class ReservationPage(val items: List<Reservation>, val totalPages: Int) {
+        val oldestDate: LocalDate? = items.mapNotNull { it.date }.minOrNull()
+    }
+
+    private suspend fun reservationPage(query: ReservationQuery, page: Int, pageLimit: Int): ReservationPage {
+        val url = url("reservations").newBuilder()
+            .addQueryParameter("include", "status,tables,location")
+            .addQueryParameter("pageLimit", pageLimit.toString())
+            .addQueryParameter("page", page.toString())
+            .addQueryParameter("sort", "reserve_date desc")
+            .apply {
+                query.locationId?.let { addQueryParameter("location", it.toString()) }
+                query.statusId?.let { addQueryParameter("status", it.toString()) }
+                query.search?.takeIf { it.isNotBlank() }?.let { addQueryParameter("search", it.trim()) }
+            }
+            .build()
+        val doc = document(send("GET", url))
+        return ReservationPage(doc.data.map { Mappers.reservation(doc, it) }, doc.totalPages)
     }
 
     suspend fun reservation(id: Long): Reservation {
