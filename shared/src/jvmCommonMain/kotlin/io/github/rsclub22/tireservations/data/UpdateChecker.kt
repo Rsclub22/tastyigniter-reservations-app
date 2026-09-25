@@ -13,8 +13,16 @@ import java.io.IOException
 data class AppUpdate(
     val version: String,
     val notes: String,
-    /** Direct link to the release APK, or the release page if no APK is attached. */
+    /** Direkter Link auf das Paket dieser Plattform, sonst auf die Release-Seite. */
     val downloadUrl: String,
+    /**
+     * Zeigt [downloadUrl] auf das Paket selbst? Sonst auf die Release-Seite, weil
+     * fuer diese Plattform nichts angehaengt war - die Meldung muss dann etwas
+     * anderes ankuendigen als einen Download.
+     */
+    val direkt: Boolean,
+    /** Endung des gefundenen Pakets - `.apk`, `.deb`; bestimmt die Wortwahl. */
+    val endung: String,
 )
 
 /**
@@ -38,7 +46,7 @@ class UpdateChecker(
      * `.deb` auf dem Desktop. Ohne Treffer verweist die Meldung auf die
      * Release-Seite, statt einem Desktop eine APK anzubieten.
      */
-    private val assetSuffix: String = ".apk",
+    val assetSuffix: String = ".apk",
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -70,6 +78,8 @@ class UpdateChecker(
                     version = tag.removePrefix("v"),
                     notes = release.string("body").orEmpty().trim(),
                     downloadUrl = anhang?.string("browser_download_url") ?: release.string("html_url").orEmpty(),
+                    direkt = anhang != null,
+                    endung = assetSuffix,
                 )
             }
         } catch (e: IOException) {

@@ -64,6 +64,24 @@ fun AutoUpdatePrompt(
     }
 }
 
+/**
+ * Was beim Klick auf den Knopf passiert - und was danach noch von Hand kommt.
+ *
+ * Installiert wird auf keiner Plattform von selbst: Android laesst eine App fremde
+ * Pakete nur mit eigener Berechtigung einspielen, und auf dem Desktop haengt es an
+ * der Paketverwaltung. Die Meldung sagt deshalb, was noch zu tun bleibt, statt ein
+ * Autoupdate anzudeuten, das es nicht gibt.
+ */
+private fun hinweis(update: AppUpdate): String = when {
+    !update.direkt ->
+        "Für dieses System hängt am Release kein fertiges Paket – die Release-Seite öffnet im Browser."
+    update.endung.equals(".apk", ignoreCase = true) ->
+        "Die neue Fassung wird im Browser heruntergeladen; danach die APK öffnen und installieren."
+    else ->
+        "Das Paket (${update.endung}) wird im Browser heruntergeladen und muss anschließend " +
+            "von Hand installiert werden."
+}
+
 @Composable
 fun UpdateDialog(
     update: AppUpdate,
@@ -76,7 +94,7 @@ fun UpdateDialog(
         title = { Text("Update verfügbar: ${update.version}") },
         text = {
             Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
-                Text("Installiert ist $installedVersion. Die neue Version wird im Browser heruntergeladen; danach die APK öffnen und installieren.")
+                Text("Installiert ist $installedVersion. " + hinweis(update))
                 if (update.notes.isNotBlank()) {
                     Text(
                         update.notes,
@@ -93,7 +111,7 @@ fun UpdateDialog(
                     Meldungen.zeige("Kein Browser gefunden")
                 }
                 onDismiss()
-            }) { Text("Herunterladen") }
+            }) { Text(if (update.direkt) "Herunterladen" else "Release öffnen") }
         },
         dismissButton = { TextButton(onClick = onLater) { Text("Später") } },
     )
