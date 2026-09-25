@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -32,6 +33,9 @@ class TastyIgniterApi(
     private val token: String?,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
+
+    /** Die Telefonannahme erwartet HH:MM, nicht HH:MM:SS. */
+    private val HHMM: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
     private val jsonMedia = "application/json; charset=utf-8".toMediaType()
     private val root: HttpUrl = baseUrl.toHttpUrlOrNull()
         ?: throw ApiException(0, "Ungültige Server-Adresse: $baseUrl")
@@ -190,9 +194,103 @@ class TastyIgniterApi(
         return out
     }
 
+    // --- Telefonannahme ------------------------------------------------------------------
+    //
+    // Eigene Endpunkte der Erweiterung wagnersnetz.reservetweaks, nicht Teil von
+    // TastyIgniters API. Sie liefern schlichtes JSON statt JSON:API, deshalb hier
+    // objekt() statt document(). Sie brauchen ein Token mit der Ability "intern:*";
+    // ein per Anmeldung erzeugtes Token hat "*" und damit auch diese.
+
+    /** Alles, was die Annahme für einen Tag braucht. */
+    suspend fun internTag(datum: LocalDate, gaeste: Int, raumId: Long? = null): Tagesdaten {
+        val url = url("intern/tag").newBuilder()
+            .addQueryParameter("datum", datum.toString())
+            .addQueryParameter("gaeste", gaeste.toString())
+            .apply { raumId?.let { addQueryParameter("raum", it.toString()) } }
+            .build()
+
+        return InternMappers.tagesdaten(objekt(send("GET", url)))
+    }
+
+    /**
+     * Nimmt eine Reservierung an.
+     *
+     * Verletzt sie eine Höchstzahl aus einem Sperrvermerk, antwortet der Server mit
+     * 422 und der Meldung am Feld `gaeste` - die landet über [ApiException.fieldErrors]
+     * direkt am Eingabefeld. Die Prüfung läuft dort und nicht hier, damit ein zweites
+     * Gerät sie nicht mit einer veralteten Belegung umgehen kann.
+     */
+    suspend fun internAnnehmen(entwurf: Annahmeentwurf): InternReservierung {
+        val body = buildJsonObject {
+            put("datum", entwurf.datum.toString())
+            put("zeit", entwurf.zeit.format(HHMM))
+            put("gaeste", entwurf.gaeste)
+            put("nachname", entwurf.nachname.trim())
+            put("telefon", entwurf.telefon.trim())
+            entwurf.email.trim().takeIf { it.isNotEmpty() }?.let { put("email", it) }
+            entwurf.notiz.trim().takeIf { it.isNotEmpty() }?.let { put("notiz", it) }
+            // ohne_tisch gewinnt gegen den Raum; den dann gar nicht mitschicken.
+            if (entwurf.ohneTisch) {
+                put("ohne_tisch", true)
+            } else {
+                entwurf.raumId?.let { put("raum", it) }
+            }
+        }
+
+        val antwort = objekt(send("POST", url("intern/reservierung"), body))
+
+        return InternMappers.reservierung(
+            antwort["reservierung"] as? JsonObject
+                ?: throw ApiException(0, "Der Server hat die angelegte Reservierung nicht zurückgemeldet."),
+        )
+    }
+
+    /**
+     * Das Tagesblatt. Ein einzelner Tag, wenn [bis] gleich [von] ist, sonst ein
+     * Zeitraum - dann bleiben leere Tage draußen.
+     *
+     * @param trennzeit `HH:MM`, oder `"aus"` für ein einziges Blatt; `null` nimmt die
+     *   Vorgabe des Servers.
+     */
+    suspend fun internTagesblatt(von: LocalDate, bis: LocalDate = von, trennzeit: String? = null): Tagesblatt {
+        val url = url("intern/tagesblatt").newBuilder()
+            .addQueryParameter("von", von.toString())
+            .addQueryParameter("bis", bis.toString())
+            .apply { trennzeit?.let { addQueryParameter("trennzeit", it) } }
+            .build()
+
+        return InternMappers.tagesblatt(objekt(send("GET", url)))
+    }
+
+    /** Einen Tag gegen die Online-Buchung sperren. Gibt die neue Liste zurück. */
+    suspend fun internSperren(datum: LocalDate, grund: String = ""): Map<String, String> {
+        val body = buildJsonObject {
+            put("datum", datum.toString())
+            grund.trim().takeIf { it.isNotEmpty() }?.let { put("grund", it) }
+        }
+
+        return sperrliste(objekt(send("POST", url("intern/sperrtage"), body)))
+    }
+
+    /** Sperre aufheben. Gibt die neue Liste zurück. */
+    suspend fun internFreigeben(datum: LocalDate): Map<String, String> {
+        val body = buildJsonObject { put("datum", datum.toString()) }
+
+        return sperrliste(objekt(send("DELETE", url("intern/sperrtage"), body)))
+    }
+
+    private fun sperrliste(o: JsonObject): Map<String, String> =
+        (o["alle"] as? JsonObject)
+            ?.mapValues { (_, v) -> runCatching { v.jsonPrimitive.content }.getOrDefault("") }
+            ?: emptyMap()
+
     // --- HTTP plumbing --------------------------------------------------------------------
 
     private fun url(path: String): HttpUrl = root.newBuilder().addPathSegments(path).build()
+
+    /** Wie [document], aber für die schlichten JSON-Antworten der Telefonannahme. */
+    private fun objekt(element: JsonElement?): JsonObject =
+        element as? JsonObject ?: throw ApiException(0, "Unerwartete Antwort vom Server.")
 
     private fun document(element: JsonElement?): JsonApiDocument =
         JsonApiDocument(element as? JsonObject ?: throw ApiException(0, "Unerwartete Antwort vom Server."))

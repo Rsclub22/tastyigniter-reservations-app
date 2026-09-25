@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import okhttp3.OkHttpClient
+import java.time.LocalDate
 
 /**
  * Single entry point for the UI. Builds an API client from the stored settings and caches
@@ -76,6 +77,22 @@ class ReservationRepository(
     suspend fun delete(id: Long) = api().deleteReservation(id)
     suspend fun updateStatus(id: Long, statusId: Long, comment: String?, notify: Boolean) =
         api().updateStatus(id, statusId, comment, notify)
+
+    // --- Telefonannahme --------------------------------------------------------------
+    // Eigene Endpunkte der Server-Erweiterung. Absichtlich ohne Zwischenspeicher: die
+    // Belegung eines Tages aendert sich genau dann, wenn jemand anruft.
+
+    suspend fun internTag(datum: LocalDate, gaeste: Int, raumId: Long? = null) =
+        api().internTag(datum, gaeste, raumId)
+
+    suspend fun internAnnehmen(entwurf: Annahmeentwurf) = api().internAnnehmen(entwurf)
+
+    suspend fun internTagesblatt(von: LocalDate, bis: LocalDate = von, trennzeit: String? = null) =
+        api().internTagesblatt(von, bis, trennzeit)
+
+    suspend fun internSperren(datum: LocalDate, grund: String = "") = api().internSperren(datum, grund)
+
+    suspend fun internFreigeben(datum: LocalDate) = api().internFreigeben(datum)
 
     suspend fun locations(): List<Location> =
         locations ?: api().locations().also { locations = it }

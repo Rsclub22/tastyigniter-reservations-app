@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.PhoneForwarded
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -85,6 +86,7 @@ fun ReservationListScreen(
     settingsStore: SettingsStore,
     onOpen: (Long) -> Unit,
     onCreate: (LocalDate) -> Unit,
+    onAnnahme: () -> Unit,
     onSettings: () -> Unit,
     onUnauthorized: () -> Unit,
 ) {
@@ -131,6 +133,12 @@ fun ReservationListScreen(
                     actions = {
                         IconButton(onClick = { vm.setSearchActive(true) }) {
                             Icon(Icons.Outlined.Search, contentDescription = "Suchen")
+                        }
+                        IconButton(onClick = onAnnahme) {
+                            Icon(
+                                Icons.AutoMirrored.Outlined.PhoneForwarded,
+                                contentDescription = "Telefonannahme",
+                            )
                         }
                         IconButton(onClick = onSettings) {
                             Icon(Icons.Outlined.Settings, contentDescription = "Einstellungen")

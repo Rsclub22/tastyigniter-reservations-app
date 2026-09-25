@@ -18,6 +18,7 @@ import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.data.UpdateChecker
 import io.github.rsclub22.tireservations.ui.components.LoadingBox
+import io.github.rsclub22.tireservations.ui.annahme.TelefonannahmeScreen
 import io.github.rsclub22.tireservations.ui.detail.ReservationDetailScreen
 import io.github.rsclub22.tireservations.ui.edit.ReservationEditScreen
 import io.github.rsclub22.tireservations.ui.list.ReservationListScreen
@@ -32,6 +33,7 @@ private object Routes {
     const val LIST = "list"
     const val DETAIL = "detail/{id}"
     const val EDIT = "edit?id={id}&date={date}"
+    const val ANNAHME = "annahme"
     const val SETTINGS = "settings"
 
     fun detail(id: Long) = "detail/$id"
@@ -88,7 +90,15 @@ private fun AppNavHost(
                 settingsStore = settingsStore,
                 onOpen = { nav.navigate(Routes.detail(it)) },
                 onCreate = { nav.navigate(Routes.edit(date = it)) },
+                onAnnahme = { nav.navigate(Routes.ANNAHME) },
                 onSettings = { nav.navigate(Routes.SETTINGS) },
+                onUnauthorized = toLogin,
+            )
+        }
+        composable(Routes.ANNAHME) {
+            TelefonannahmeScreen(
+                repository = repository,
+                onBack = { nav.popBackStack() },
                 onUnauthorized = toLogin,
             )
         }
