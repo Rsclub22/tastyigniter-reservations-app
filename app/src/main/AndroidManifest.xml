@@ -14,6 +14,10 @@
         </intent>
     </queries>
 
+    <!-- Ab Android 13 muss der Benutzer Meldungen erlauben; ohne das Recht
+         verwirft das System sie stillschweigend. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".ReservationsApp"
         android:allowBackup="false"

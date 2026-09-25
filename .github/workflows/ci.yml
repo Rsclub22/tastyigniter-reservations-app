@@ -1,0 +1,163 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  build:
+    name: Lint, Tests & Debug-APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Also validates the Gradle wrapper checksum.
+      - uses: gradle/actions/setup-gradle@v6
+
+      # Die Unit-Tests liegen in :shared/jvmCommonTest und laufen über das
+      # Desktop-Ziel. Dieselben Klassen, dieselbe JVM - das Android-Ziel der
+      # KMP-Bibliothek bringt von sich aus keinen Test-Quellsatz mit.
+      - name: Lint & Unit-Tests
+        run: ./gradlew :app:lintDebug :shared:desktopTest --stacktrace
+
+      - name: Debug-APK bauen
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew :app:assembleDebug
+
+      - name: Debug-APK hochladen
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+
+      - name: Berichte hochladen
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports
+          path: |
+            app/build/reports/lint-results-debug.html
+            shared/build/reports/tests/
+          retention-days: 14
+
+  desktop:
+    name: Desktop-Paket (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      # jpackage baut ausschliesslich für das System, auf dem es läuft. Windows
+      # und macOS brauchen daher eigene Runner - hier vorgemerkt, noch nicht aktiv:
+      #   - { os: windows-latest, task: packageMsi, artefakt: msi }
+      #   - { os: macos-latest,   task: packageDmg, artefakt: dmg }
+      matrix:
+        include:
+          - { os: ubuntu-latest, task: packageDeb, artefakt: deb }
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Paket bauen
+        run: ./gradlew :shared:${{ matrix.task }}
+
+      - name: Paket hochladen
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-${{ matrix.artefakt }}
+          path: shared/build/compose/binaries/main/${{ matrix.artefakt }}/*
+          retention-days: 14
+
+      - name: jpackage-Protokolle bei Fehler hochladen
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jpackage-logs-${{ matrix.artefakt }}
+          path: shared/build/compose/logs/
+          retention-days: 7
+
+  release:
+    name: Signiertes Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, desktop]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Keystore aus Secrets bereitstellen
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::Secret ANDROID_KEYSTORE_BASE64 fehlt – das Release wird nur mit einem Debug-Schlüssel signiert."
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Release-APK, -AAB und Desktop-Paket bauen
+        env:
+          VERSION_NAME: ${{ github.ref_name }}
+          VERSION_CODE: ${{ github.run_number }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          export VERSION_NAME="${VERSION_NAME#v}"
+          ./gradlew :app:assembleRelease :app:bundleRelease :shared:packageDeb :shared:createDistributable
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/ti-reservierungen-${VERSION_NAME}.apk"
+          cp app/build/outputs/bundle/release/app-release.aab "dist/ti-reservierungen-${VERSION_NAME}.aab"
+          cp shared/build/compose/binaries/main/deb/*.deb "dist/"
+
+          # Das ausgepackte Programm als .tar.gz. Nur damit kann sich die
+          # Desktop-Fassung selbst erneuern: eine über die Paketverwaltung
+          # installierte Fassung gehört ihr, und ohne Root kommt die App dort
+          # nicht heran. Die Update-Prüfung sucht nach genau dieser Endung
+          # (s. Main.kt, assetSuffix).
+          tar czf "dist/ti-reservierungen-${VERSION_NAME}-linux-x64.tar.gz" \
+            -C shared/build/compose/binaries/main/app tastyigniter-reservierungen
+
+          # Prüfsumme daneben: die App spielt ohne sie nichts ein, weil ein
+          # abgebrochener Download sonst aussähe wie eine neue Fassung.
+          ( cd dist && sha256sum "ti-reservierungen-${VERSION_NAME}-linux-x64.tar.gz" \
+              > "ti-reservierungen-${VERSION_NAME}-linux-x64.tar.gz.sha256" )
+
+      - name: GitHub-Release erstellen
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          generate_release_notes: true
