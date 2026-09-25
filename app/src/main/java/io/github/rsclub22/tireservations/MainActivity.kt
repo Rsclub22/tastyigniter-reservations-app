@@ -10,6 +10,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import io.github.rsclub22.tireservations.ui.AppNavigation
 import io.github.rsclub22.tireservations.ui.theme.ReservationsTheme
+import io.github.rsclub22.tireservations.ui.update.AutoUpdatePrompt
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,7 +20,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             ReservationsTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    AppNavigation(app.repository, app.settingsStore)
+                    AppNavigation(app.repository, app.settingsStore, app.updateChecker)
+                    AutoUpdatePrompt(
+                        checker = app.updateChecker,
+                        settingsStore = app.settingsStore,
+                        alreadyChecked = { app.updateCheckedThisSession },
+                        markChecked = { app.updateCheckedThisSession = true },
+                    )
                 }
             }
         }

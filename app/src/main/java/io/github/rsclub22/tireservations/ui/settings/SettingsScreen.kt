@@ -13,6 +13,7 @@ import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.SystemUpdate
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -36,9 +37,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.rsclub22.tireservations.BuildConfig
 import io.github.rsclub22.tireservations.data.AppSettings
+import io.github.rsclub22.tireservations.data.AppUpdate
 import io.github.rsclub22.tireservations.data.Location
 import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.SettingsStore
+import io.github.rsclub22.tireservations.data.UpdateChecker
+import io.github.rsclub22.tireservations.ui.update.UpdateDialog
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,6 +50,7 @@ import kotlinx.coroutines.launch
 fun SettingsScreen(
     repository: ReservationRepository,
     settingsStore: SettingsStore,
+    updateChecker: UpdateChecker,
     onBack: () -> Unit,
     onLoggedOut: () -> Unit,
 ) {
@@ -53,8 +58,13 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     var locations by remember { mutableStateOf<List<Location>>(emptyList()) }
     var cacheCleared by remember { mutableStateOf(false) }
+    var updateStatus by remember { mutableStateOf<String?>(null) }
+    var checkingUpdate by remember { mutableStateOf(false) }
+    var foundUpdate by remember { mutableStateOf<AppUpdate?>(null) }
 
     LaunchedEffect(Unit) { locations = runCatching { repository.locations() }.getOrDefault(emptyList()) }
+
+    foundUpdate?.let { UpdateDialog(update = it, onDismiss = { foundUpdate = null }) }
 
     Scaffold(
         topBar = {
@@ -128,6 +138,31 @@ fun SettingsScreen(
                 headlineContent = { Text("Version") },
                 supportingContent = { Text("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") },
                 leadingContent = { Icon(Icons.Outlined.Info, contentDescription = null) },
+            )
+            ListItem(
+                headlineContent = { Text("Nach Updates suchen") },
+                supportingContent = {
+                    Text(
+                        when {
+                            !updateChecker.isEnabled -> "Updates kommen über Google Play."
+                            checkingUpdate -> "Suche …"
+                            else -> updateStatus ?: "Neue Versionen von GitHub prüfen"
+                        },
+                    )
+                },
+                leadingContent = { Icon(Icons.Outlined.SystemUpdate, contentDescription = null) },
+                modifier = Modifier.selectable(selected = false, enabled = updateChecker.isEnabled && !checkingUpdate) {
+                    checkingUpdate = true
+                    scope.launch {
+                        runCatching { updateChecker.check() }
+                            .onSuccess { update ->
+                                foundUpdate = update
+                                updateStatus = if (update == null) "Die App ist aktuell." else "Version ${update.version} verfügbar."
+                            }
+                            .onFailure { updateStatus = it.message ?: "Update-Prüfung fehlgeschlagen." }
+                        checkingUpdate = false
+                    }
+                },
             )
         }
     }

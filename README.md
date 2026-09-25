@@ -19,6 +19,7 @@ eigener Server benötigt.
   E-Mail-Benachrichtigung an den Gast
 - Gast direkt **anrufen** oder **per E-Mail** kontaktieren
 - Standard-Standort für Betriebe mit mehreren Filialen
+- Update-Hinweis bei neuen GitHub-Releases (nicht bei Installation aus dem Play Store)
 - Material 3, Dark Mode, dynamische Farben (Android 12+)
 
 ## Voraussetzungen in TastyIgniter
@@ -51,6 +52,10 @@ Verwendete Endpunkte:
 
 Fertige APKs gibt es unter **Releases** (signiert) bzw. bei jedem CI-Lauf als Artefakt
 `app-debug-apk` (Debug-Build, lässt sich parallel zur Release-Version installieren).
+Die Release-App meldet neue Versionen selbst (*Einstellungen → Nach Updates suchen*).
+
+Beide Vertriebswege (GitHub-Releases und Google Play Store) sind in
+[docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) Schritt für Schritt beschrieben.
 
 ## Entwicklung
 
