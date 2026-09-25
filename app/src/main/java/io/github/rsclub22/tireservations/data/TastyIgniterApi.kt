@@ -61,7 +61,15 @@ class TastyIgniterApi(
 
     // --- Reservations ---------------------------------------------------------------------
 
-    suspend fun reservations(query: ReservationQuery, pageLimit: Int = 100, maxPages: Int = 20): List<Reservation> {
+    /**
+     * Loads reservations, newest date first, and filters by [ReservationQuery.date] on the client.
+     *
+     * The API's `dateTimeFilter` can't be used: TastyIgniter passes the filter through
+     * Spatie's `FiltersScope`, which flattens `{startAt, endAt}` into positional arguments, so the
+     * scope ends up filtering between "now" and "now" and returns nothing. Instead we page through
+     * the list sorted by `reserve_date desc` and stop once a page lies entirely before the wanted day.
+     */
+    suspend fun reservations(query: ReservationQuery, pageLimit: Int = 100, maxPages: Int = 50): List<Reservation> {
         val result = mutableListOf<Reservation>()
         var page = 1
         while (page <= maxPages) {
@@ -69,25 +77,23 @@ class TastyIgniterApi(
                 .addQueryParameter("include", "status,tables,location")
                 .addQueryParameter("pageLimit", pageLimit.toString())
                 .addQueryParameter("page", page.toString())
-                .addQueryParameter("sort", "reserve_date asc")
+                .addQueryParameter("sort", "reserve_date desc")
                 .apply {
                     query.locationId?.let { addQueryParameter("location", it.toString()) }
                     query.statusId?.let { addQueryParameter("status", it.toString()) }
                     query.search?.takeIf { it.isNotBlank() }?.let { addQueryParameter("search", it.trim()) }
-                    query.date?.let { date ->
-                        addQueryParameter("dateTimeFilter[startAt]", "${date.format(ISO_DATE)} 00:00:00")
-                        addQueryParameter("dateTimeFilter[endAt]", "${date.format(ISO_DATE)} 23:59:59")
-                    }
                 }
                 .build()
             val doc = document(send("GET", url))
-            result += doc.data.map { Mappers.reservation(doc, it) }
-            if (doc.currentPage >= doc.totalPages) break
+            val items = doc.data.map { Mappers.reservation(doc, it) }
+            result += items
+            if (doc.currentPage >= doc.totalPages || items.isEmpty()) break
+            val latestOnPage = items.mapNotNull { it.date }.maxOrNull()
+            if (query.date != null && latestOnPage != null && latestOnPage < query.date) break
             page++
         }
-        // The server filters by date already; filter again in case an older version ignores it.
         return result
-            .filter { query.date == null || it.date == null || it.date == query.date }
+            .filter { query.date == null || it.date == query.date }
             .sortedWith(compareBy(nullsLast()) { r: Reservation -> r.date }.thenBy(nullsLast()) { it.time })
     }
 

@@ -78,15 +78,34 @@ class TastyIgniterApiTest {
         assertEquals("2", server.takeRequest().requestUrl!!.queryParameter("page"))
     }
 
+    private fun reservationJson(id: Int, date: String, time: String = "19:00:00") =
+        """{"type":"reservations","id":"$id","attributes":{"reservation_id":$id,"guest_num":2,""" +
+            """"first_name":"G$id","last_name":"X","reserve_date":"$date","reserve_time":"$time"}}"""
+
+    private fun page(current: Int, total: Int, vararg items: String) =
+        """{"data":[${items.joinToString(",")}],"meta":{"pagination":{"current_page":$current,"total_pages":$total}}}"""
+
     @Test
-    fun `sends date range filter`() = runTest {
-        server.enqueue(MockResponse().setBody("""{"data":[]}"""))
+    fun `day view pages newest first and filters on the client`() = runTest {
+        server.enqueue(
+            MockResponse().setBody(
+                page(1, 5, reservationJson(1, "2026-09-27"), reservationJson(2, "2026-09-25", "20:00:00"), reservationJson(3, "2026-09-25", "18:00:00")),
+            ),
+        )
+        server.enqueue(MockResponse().setBody(page(2, 5, reservationJson(4, "2026-09-25", "12:00:00"), reservationJson(5, "2026-09-24"))))
+        server.enqueue(MockResponse().setBody(page(3, 5, reservationJson(6, "2026-09-23"))))
 
-        api().reservations(ReservationQuery(date = LocalDate.of(2026, 9, 25)))
+        val list = api().reservations(ReservationQuery(date = LocalDate.of(2026, 9, 25)))
 
-        val url = server.takeRequest().requestUrl!!
-        assertEquals("2026-09-25 00:00:00", url.queryParameter("dateTimeFilter[startAt]"))
-        assertEquals("2026-09-25 23:59:59", url.queryParameter("dateTimeFilter[endAt]"))
+        assertEquals(listOf(4L, 3L, 2L), list.map { it.id })
+        val first = server.takeRequest().requestUrl!!
+        assertEquals("reserve_date desc", first.queryParameter("sort"))
+        // The server-side dateTimeFilter is broken in TastyIgniter and must not be sent.
+        assertEquals(null, first.queryParameter("dateTimeFilter[startAt]"))
+        server.takeRequest()
+        server.takeRequest()
+        // Page 3 lies entirely before the requested day, so paging stops there.
+        assertEquals(3, server.requestCount)
     }
 
     @Test
