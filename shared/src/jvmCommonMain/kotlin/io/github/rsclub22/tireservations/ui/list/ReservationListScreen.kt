@@ -315,7 +315,14 @@ fun ReservationListScreen(
                             }
                         }
                         items(state.reservations, key = { it.id }) { r ->
-                            ReservationCard(r, showDate = state.isSearching, onClick = { onOpen(r.id) })
+                            // Sperrvermerke sind keine Gesellschaft, sondern die
+                            // Ansage fuer den Tag - dargestellt wie in der Annahme,
+                            // nicht als Zeile mit sechsstelliger Gaestezahl.
+                            if (state.istVermerk(r)) {
+                                VermerkBand(r, onClick = { onOpen(r.id) })
+                            } else {
+                                ReservationCard(r, showDate = state.isSearching, onClick = { onOpen(r.id) })
+                            }
                         }
                     }
                 }
@@ -420,6 +427,39 @@ private fun OffeneKarte(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Ein Sperrvermerk in der Tagesliste - dasselbe Band wie in der Telefonannahme.
+ *
+ * Sein Text ist oft die wichtigste Angabe des Tages: dort stehen die Essenszeiten
+ * und die Hoechstzahl. Als gewoehnliche Zeile waere er unbrauchbar, weil er alle
+ * Tische fuehrt und mehr Gaeste als das Haus Plaetze hat.
+ */
+@Composable
+private fun VermerkBand(r: Reservation, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        ),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Text(
+                "SPERRVERMERK" + (r.time?.let { " · ab ${it.display()} Uhr" } ?: ""),
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
+            Text(
+                r.comment.ifBlank { "Ohne Text – dieser Tag ist für die Online-Buchung verriegelt." },
+                Modifier.padding(top = 4.dp),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer,
+            )
         }
     }
 }

@@ -46,8 +46,16 @@ data class ListState(
      */
     val offene: List<InternReservierung> = emptyList(),
     val offeneGesamt: Int = 0,
+    /** Plaetze des Hauses; daran werden Sperrvermerke erkannt. 0 = unbekannt. */
+    val hausgroesse: Int = 0,
 ) {
-    val guestTotal: Int get() = reservations.sumOf { it.guestNum }
+    /**
+     * Ein Sperrvermerk ist eine Pseudo-Reservierung, die einen Tag verriegelt,
+     * indem sie mehr Gaeste fuehrt als ueberhaupt ins Haus passen. Er ist keine
+     * Gesellschaft - weder in der Gaestesumme noch als Zeile.
+     */
+    fun istVermerk(r: Reservation): Boolean = hausgroesse > 0 && r.guestNum > hausgroesse
+    val guestTotal: Int get() = reservations.filterNot(::istVermerk).sumOf { it.guestNum }
     val isSearching: Boolean get() = searchActive && search.isNotBlank()
 }
 
@@ -91,7 +99,13 @@ class ReservationListViewModel(
         // die Markierung soll zeigen, was insgesamt offen ist.
         val offen = runCatching { repository.internOffen(0) }.getOrNull() ?: return
 
-        _state.update { it.copy(offene = offen.reservierungen, offeneGesamt = offen.offenGesamt) }
+        _state.update {
+            it.copy(
+                offene = offen.reservierungen,
+                offeneGesamt = offen.offenGesamt,
+                hausgroesse = offen.hausgroesse,
+            )
+        }
     }
 
     private suspend fun loadLookups() {

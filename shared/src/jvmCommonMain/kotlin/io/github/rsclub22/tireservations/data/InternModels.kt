@@ -230,6 +230,12 @@ data class OffeneReservierungen(
     val hoechsteId: Long,
     val anzahl: Int,
     val offenGesamt: Int,
+    /**
+     * Plaetze des ganzen Hauses. Damit erkennt die App Sperrvermerke auch in
+     * Listen, die ueber das gewoehnliche /api/reservations kommen - dort fehlt
+     * das Kennzeichen, und die Regel ist allein "mehr Gaeste als Plaetze".
+     */
+    val hausgroesse: Int,
     val reservierungen: List<InternReservierung>,
 )
 
@@ -265,6 +271,7 @@ internal object InternMappers {
         hoechsteId = o.long("hoechste_id") ?: 0,
         anzahl = o.int("anzahl") ?: 0,
         offenGesamt = o.int("offen_gesamt") ?: 0,
+        hausgroesse = o.int("hausgroesse") ?: 0,
         reservierungen = objekte(o["reservierungen"]).map(::reservierung),
     )
 

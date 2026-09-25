@@ -34,6 +34,7 @@ class WachdienstTest {
             seit = 0,
             hoechsteId = 178,
             anzahl = 3,
+            hausgroesse = 578,
             offenGesamt = 3,
             reservierungen = listOf(
                 reservierung(150, "Alt", 2),
@@ -55,6 +56,7 @@ class WachdienstTest {
             seit = 173,
             hoechsteId = 178,
             anzahl = 1,
+            hausgroesse = 578,
             offenGesamt = 1,
             reservierungen = listOf(reservierung(178, "Testgast", 4)),
         )
@@ -76,6 +78,7 @@ class WachdienstTest {
             seit = 100,
             hoechsteId = 205,
             anzahl = 5,
+            hausgroesse = 578,
             offenGesamt = 5,
             reservierungen = (1..5).map { reservierung(200L + it, "Gast $it", it) },
         )
@@ -98,6 +101,7 @@ class WachdienstTest {
             // Es kamen bestaetigte Reservierungen dazu, aber keine unbestaetigte.
             hoechsteId = 190,
             anzahl = 0,
+            hausgroesse = 578,
             offenGesamt = 2,
             reservierungen = emptyList(),
         )
