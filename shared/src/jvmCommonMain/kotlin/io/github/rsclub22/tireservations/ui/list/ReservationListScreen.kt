@@ -19,6 +19,10 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import io.github.rsclub22.tireservations.data.InternReservierung
+import androidx.compose.material.icons.outlined.MarkEmailUnread
+import androidx.compose.material.icons.outlined.ExpandMore
+import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.Print
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,6 +48,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.TableRestaurant
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
@@ -290,6 +295,15 @@ fun ReservationListScreen(
                         state.error?.let { msg ->
                             item { ErrorCard(msg, onRetry = vm::refresh) }
                         }
+                        if (state.offeneGesamt > 0) {
+                            item {
+                                OffeneKarte(
+                                    offene = state.offene,
+                                    gesamt = state.offeneGesamt,
+                                    onOeffnen = onOpen,
+                                )
+                            }
+                        }
                         if (state.error == null) {
                             item {
                                 Text(
@@ -326,6 +340,87 @@ fun ReservationListScreen(
             dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Abbrechen") } },
         ) { DatePicker(state = pickerState) }
     }
+    }
+}
+
+/**
+ * Was ueber das oeffentliche Formular hereinkam und noch zu bestaetigen ist.
+ *
+ * Steht ueber der Tagesliste und nicht darin: diese Reservierungen liegen meist
+ * an anderen Tagen als dem gezeigten. Eine blosse Zahl waere zu wenig - man
+ * muesste sie danach suchen -, deshalb laesst sich die Karte aufklappen und
+ * fuehrt mit einem Tippen direkt zur Reservierung.
+ */
+@Composable
+private fun OffeneKarte(
+    offene: List<InternReservierung>,
+    gesamt: Int,
+    onOeffnen: (Long) -> Unit,
+) {
+    var offen by remember { mutableStateOf(false) }
+
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+        ),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Row(
+                Modifier.fillMaxWidth().clickable { offen = !offen },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Outlined.MarkEmailUnread,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    if (gesamt == 1) {
+                        "Eine Reservierung wartet auf Bestätigung"
+                    } else {
+                        "$gesamt Reservierungen warten auf Bestätigung"
+                    },
+                    Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+                Icon(
+                    if (offen) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
+                    contentDescription = if (offen) "Zuklappen" else "Aufklappen",
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+            }
+
+            if (offen) {
+                offene.forEach { r ->
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .clickable { onOeffnen(r.id) }
+                            .padding(vertical = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "${r.datum.display()} ${r.zeit.display()}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        )
+                        Text(
+                            "${r.name.ifBlank { "ohne Namen" }} · ${r.gaeste} Pers.",
+                            Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            overflow = TextOverflow.Ellipsis,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

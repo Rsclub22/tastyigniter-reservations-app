@@ -3,6 +3,7 @@ package io.github.rsclub22.tireservations.ui.list
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.rsclub22.tireservations.data.ApiException
+import io.github.rsclub22.tireservations.data.InternReservierung
 import io.github.rsclub22.tireservations.data.Location
 import io.github.rsclub22.tireservations.data.Reservation
 import io.github.rsclub22.tireservations.data.ReservationQuery
@@ -38,6 +39,13 @@ data class ListState(
     val refreshing: Boolean = false,
     val error: String? = null,
     val unauthorized: Boolean = false,
+    /**
+     * Unbestaetigte Reservierungen - die ueber das oeffentliche Formular. Sie
+     * liegen meist an anderen Tagen als dem gezeigten, deshalb stehen sie
+     * ueber der Tagesliste und nicht darin.
+     */
+    val offene: List<InternReservierung> = emptyList(),
+    val offeneGesamt: Int = 0,
 ) {
     val guestTotal: Int get() = reservations.sumOf { it.guestNum }
     val isSearching: Boolean get() = searchActive && search.isNotBlank()
@@ -59,6 +67,7 @@ class ReservationListViewModel(
             _state.update { it.copy(locationId = defaultLocation) }
             loadLookups()
             load()
+            ladeOffene()
         }
         _state.map { it.search }
             .distinctUntilChanged()
@@ -66,6 +75,23 @@ class ReservationListViewModel(
             .debounce(400)
             .onEach { load() }
             .launchIn(viewModelScope)
+    }
+
+    /**
+     * Holt die unbestaetigten Reservierungen fuer die Markierung.
+     *
+     * Rein lesend: den Merker fuer die Benachrichtigungen ruecken allein die
+     * Wachdienste vor. Faellt der Abruf aus - etwa weil das Token die Ability
+     * "intern" nicht hat -, bleibt die Markierung einfach weg; die Tagesliste
+     * deswegen mit einem Fehler zu behelligen waere unverhaeltnismaessig.
+     */
+    private suspend fun ladeOffene() {
+        // seit = 0 liefert alle unbestaetigten, nicht nur die seit dem letzten
+        // Blick hinzugekommenen. Der Merker gehoert allein den Benachrichtigungen;
+        // die Markierung soll zeigen, was insgesamt offen ist.
+        val offen = runCatching { repository.internOffen(0) }.getOrNull() ?: return
+
+        _state.update { it.copy(offene = offen.reservierungen, offeneGesamt = offen.offenGesamt) }
     }
 
     private suspend fun loadLookups() {
@@ -87,6 +113,7 @@ class ReservationListViewModel(
         viewModelScope.launch {
             if (_state.value.locations.isEmpty()) loadLookups()
             load(pullToRefresh = true)
+            ladeOffene()
         }
     }
 
@@ -94,7 +121,10 @@ class ReservationListViewModel(
 
     /** Called whenever the screen becomes visible; reloads silently when coming back from another screen. */
     fun onScreenShown() {
-        if (shownBefore) load(quiet = true)
+        if (shownBefore) {
+            load(quiet = true)
+            viewModelScope.launch { ladeOffene() }
+        }
         shownBefore = true
     }
 
