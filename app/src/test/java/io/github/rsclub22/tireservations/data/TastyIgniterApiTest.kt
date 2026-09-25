@@ -2,6 +2,7 @@ package io.github.rsclub22.tireservations.data
 
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
@@ -169,6 +170,9 @@ class TastyIgniterApiTest {
         val updated = Json.parseToJsonElement(server.takeRequest().body.readUtf8()) as JsonObject
         assertEquals("", updated["email"]!!.jsonPrimitive.content)
         assertTrue("status_id" !in updated)
+        // Location default: omitted on create, explicitly cleared on update.
+        assertTrue("duration" !in created)
+        assertEquals(JsonNull, updated["duration"])
     }
 
     @Test

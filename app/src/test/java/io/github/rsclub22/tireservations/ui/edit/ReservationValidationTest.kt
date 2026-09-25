@@ -45,6 +45,11 @@ class ReservationValidationTest {
         // 48 h must not shrink to 24 h just because the picker shows 19:00.
         assertEquals(2880, ReservationEditViewModel.durationForEnd(start, start, 2880))
         assertEquals(1470 + 1440, ReservationEditViewModel.durationForEnd(start, LocalTime.of(19, 30), 2900))
+        // An earlier clock time stays on the current end day instead of adding a day.
+        assertEquals(2820, ReservationEditViewModel.durationForEnd(start, LocalTime.of(18, 0), 2900))
+        // Short stays still pick the next occurrence of the time after the start.
+        assertEquals(240, ReservationEditViewModel.durationForEnd(start, LocalTime.of(23, 0), 300))
+        assertEquals(360, ReservationEditViewModel.durationForEnd(start, LocalTime.of(1, 0), 150))
     }
 
     @Test

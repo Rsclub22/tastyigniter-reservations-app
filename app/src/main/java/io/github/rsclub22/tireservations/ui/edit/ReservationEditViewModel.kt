@@ -149,12 +149,15 @@ class ReservationEditViewModel(
         }
 
         /**
-         * Duration for a newly picked end time. The picker only knows a clock time, so whole
-         * extra days of a stay longer than 24 hours are kept from [currentDuration].
+         * Duration for a newly picked end time. The picker only knows a clock time:
+         * - stays under 24 hours end at the next occurrence of that time after the start;
+         * - longer stays keep the day they currently end on, so only the clock time changes.
          */
         fun durationForEnd(start: LocalTime, end: LocalTime, currentDuration: Int?): Int {
-            val extraDays = ((currentDuration ?: 1) - 1).coerceAtLeast(0) / MINUTES_PER_DAY
-            return durationBetween(start, end) + extraDays * MINUTES_PER_DAY
+            if (currentDuration == null || currentDuration < MINUTES_PER_DAY) return durationBetween(start, end)
+            val endDay = daysAfterStart(start, currentDuration)
+            val minutes = endDay * MINUTES_PER_DAY + (end.toSecondOfDay() - start.toSecondOfDay()) / 60
+            return if (minutes <= 0) minutes + MINUTES_PER_DAY else minutes
         }
 
         /** Number of days the stay ends after the start day (0 = same day). */
