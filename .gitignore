@@ -3,8 +3,9 @@
 /local.properties
 /.idea/
 .DS_Store
-/build/
-/app/build/
+# Ohne fuehrenden Schraegstrich, damit auch shared/build/ und kuenftige Module
+# erfasst sind.
+build/
 /captures/
 .externalNativeBuild/
 .cxx/

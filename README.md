@@ -1,7 +1,7 @@
-# TastyIgniter Reservierungen (Android)
+# TastyIgniter Reservierungen
 
-Android-App für das Restaurant-Team, um Tischreservierungen in [TastyIgniter](https://tastyigniter.com)
-zu verwalten: Reservierungen des Tages ansehen, telefonische Reservierungen selbst eintragen,
+App für das Restaurant-Team, um Tischreservierungen in [TastyIgniter](https://tastyigniter.com)
+zu verwalten – auf **Android** und auf dem **Linux-Desktop**, mit demselben Funktionsumfang: Reservierungen des Tages ansehen, telefonische Reservierungen selbst eintragen,
 bearbeiten, bestätigen/stornieren und löschen.
 
 Die App spricht direkt mit der REST-API von TastyIgniter (Erweiterung **igniter.api**). Es wird kein
@@ -19,8 +19,10 @@ eigener Server benötigt.
   E-Mail-Benachrichtigung an den Gast
 - Gast direkt **anrufen** oder **per E-Mail** kontaktieren
 - Standard-Standort für Betriebe mit mehreren Filialen
-- Update-Hinweis bei neuen GitHub-Releases (nicht bei Installation aus dem Play Store)
-- Material 3, Dark Mode, dynamische Farben (Android 12+)
+- Update-Hinweis bei neuen GitHub-Releases (nicht bei Installation aus dem Play Store);
+  am Telefon gegen die APK im Release, auf dem Desktop gegen das .deb-Paket
+- Material 3, Dark Mode, dynamische Farben (nur Android 12+; der Desktop nutzt die
+  festen Farben des Themes)
 
 ## Voraussetzungen in TastyIgniter
 
@@ -50,41 +52,76 @@ Verwendete Endpunkte:
 
 ## Installation
 
-Fertige APKs gibt es unter **Releases** (signiert) bzw. bei jedem CI-Lauf als Artefakt
-`app-debug-apk` (Debug-Build, lässt sich parallel zur Release-Version installieren).
-Die Release-App meldet neue Versionen selbst (*Einstellungen → Nach Updates suchen*).
+**Android:** Fertige APKs gibt es unter **Releases** (signiert) bzw. bei jedem CI-Lauf als
+Artefakt `app-debug-apk` (Debug-Build, lässt sich parallel zur Release-Version
+installieren). Die Release-App meldet neue Versionen selbst
+(*Einstellungen → Nach Updates suchen*).
+
+**Desktop:** Unter **Releases** liegt ein `.deb` für Debian/Ubuntu, bei jedem CI-Lauf
+auch als Artefakt `desktop-deb`. Auf Arch-Systemen (kein `dpkg`) stattdessen selbst
+bauen – `./gradlew :shared:createDistributable` legt unter
+`shared/build/compose/binaries/main/app/` ein eigenständiges Verzeichnis mit Starter und
+mitgeliefertem JRE ab.
 
 Beide Vertriebswege (GitHub-Releases und Google Play Store) sind in
 [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) Schritt für Schritt beschrieben.
 
 ## Entwicklung
 
-- Kotlin, Jetpack Compose, Material 3, OkHttp, kotlinx.serialization, DataStore
-- `minSdk` 26 (Android 8.0), `targetSdk` 36
-- JDK 17+ und Android SDK erforderlich
+- Kotlin Multiplatform, Compose Multiplatform, Material 3, OkHttp,
+  kotlinx.serialization, DataStore
+- `minSdk` 26 (Android 8.0), `targetSdk` 36, `compileSdk` 37
+- JDK 17 und Android SDK erforderlich
 
 ```bash
-./gradlew assembleDebug          # Debug-APK: app/build/outputs/apk/debug/
-./gradlew testDebugUnitTest      # Unit-Tests (JSON-Parsing, API-Client, Validierung)
-./gradlew lintDebug              # Android Lint
+./gradlew :app:assembleDebug           # Debug-APK: app/build/outputs/apk/debug/
+./gradlew :shared:desktopTest          # Unit-Tests (JSON-Parsing, API-Client, Validierung)
+./gradlew :app:lintDebug               # Android Lint
+./gradlew :shared:run                  # Desktop-Fassung starten
+./gradlew :shared:createDistributable  # eigenständiges Desktop-Programm bauen
+./gradlew :shared:packageDeb           # .deb (braucht dpkg-deb, also Debian/Ubuntu)
 ```
 
 Projektstruktur:
 
 ```
-app/src/main/java/io/github/rsclub22/tireservations/
-├── data/        API-Client, JSON:API-Parsing, Einstellungen, Repository
-└── ui/          Screens: login, list, detail, edit, settings
+shared/src/
+├── jvmCommonMain/    fast der ganze Code: data/, ui/, AppGraph, platform/ (expect)
+├── jvmCommonTest/    die Unit-Tests
+├── androidMain/      actual-Implementierungen für Android
+└── desktopMain/      actual-Implementierungen + main() für den Desktop
+
+app/src/main/         nur die Android-Anwendung: Manifest, res/, MainActivity,
+                      ReservationsApp
 ```
+
+Zwei Dinge sind erklärungsbedürftig:
+
+**Warum `jvmCommonMain` und nicht `commonMain`?** Der geteilte Code benutzt `java.time`
+(rund 30 Fundstellen) und OkHttp – beides gibt es in `commonMain` nicht. Da sowohl
+Android als auch Desktop auf der JVM laufen, liegt der Code in einem Zwischen-Source-Set,
+von dem beide Ziele abhängen. Eine Umstellung auf `kotlinx-datetime` und Ktor wäre erst
+nötig, wenn ein Nicht-JVM-Ziel dazukommt (iOS, wasm); `jvmCommonMain` ist dann genau die
+Liste dessen, was umzuziehen ist.
+
+**Warum zwei Module?** Seit AGP 9 dürfen `com.android.application` und das
+Multiplatform-Plugin nicht mehr im selben Modul stehen. `:shared` ist daher eine
+KMP-Bibliothek (`com.android.kotlin.multiplatform.library`) mit beiden Zielen, `:app` nur
+noch die Android-Anwendungshülle darum.
 
 ## CI/CD-Pipeline
 
-`.github/workflows/android.yml`:
+`.github/workflows/ci.yml`:
 
-- **Jeder Push / Pull Request**: Lint, Unit-Tests, Debug-APK bauen; APK und Berichte werden als
-  Artefakte hochgeladen.
-- **Tag `v*`** (z. B. `v1.0.0`): signiertes Release-APK und -AAB bauen und als GitHub-Release
-  veröffentlichen. `versionName` kommt aus dem Tag, `versionCode` aus der Laufnummer.
+- **Jeder Push / Pull Request**: Lint, Unit-Tests, Debug-APK bauen; zusätzlich das
+  Desktop-Paket. APK, `.deb` und Berichte werden als Artefakte hochgeladen.
+- **Tag `v*`** (z. B. `v1.0.0`): signiertes Release-APK, -AAB und das `.deb` bauen und als
+  GitHub-Release veröffentlichen. `versionName` kommt aus dem Tag, `versionCode` aus der
+  Laufnummer.
+
+Der Desktop-Job läuft als Matrix mit bisher einem Eintrag (`ubuntu-latest` → `.deb`).
+`jpackage` baut ausschließlich für das System, auf dem es läuft; Windows und macOS
+brauchen daher eigene Runner und sind in der Matrix auskommentiert vorgemerkt.
 
 Dependabot hält Gradle-Abhängigkeiten und Actions aktuell.
 
