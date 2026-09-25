@@ -4,6 +4,7 @@ import io.github.rsclub22.tireservations.data.ReservationDraft
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalTime
 
 class ReservationValidationTest {
 
@@ -24,6 +25,14 @@ class ReservationValidationTest {
             setOf("location_id", "guest_num", "first_name", "last_name", "telephone"),
             errors.keys,
         )
+    }
+
+    @Test
+    fun `duration from start and end`() {
+        assertEquals(150, ReservationEditViewModel.durationBetween(LocalTime.of(18, 30), LocalTime.of(21, 0)))
+        // An end before the start runs past midnight.
+        assertEquals(180, ReservationEditViewModel.durationBetween(LocalTime.of(22, 0), LocalTime.of(1, 0)))
+        assertEquals(24 * 60, ReservationEditViewModel.durationBetween(LocalTime.of(19, 0), LocalTime.of(19, 0)))
     }
 
     @Test

@@ -15,7 +15,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalTime
 
 data class EditState(
     val isNew: Boolean,
@@ -97,6 +99,14 @@ class ReservationEditViewModel(
         }
     }
 
+    /** Sets the end time; the stay is stored as a duration, so it is converted into minutes. */
+    fun setEnd(end: LocalTime?) {
+        val minutes = end?.let { durationBetween(_state.value.draft.time, it) }
+        _state.update {
+            it.copy(durationText = minutes?.toString().orEmpty(), draft = it.draft.copy(duration = minutes))
+        }
+    }
+
     fun toggleTable(id: Long) = edit { d ->
         d.copy(tableIds = if (id in d.tableIds) d.tableIds - id else d.tableIds + id)
     }
@@ -131,6 +141,12 @@ class ReservationEditViewModel(
     }
 
     companion object {
+        /** Minutes from [start] to [end]; an end at or before the start is taken as the next day. */
+        fun durationBetween(start: LocalTime, end: LocalTime): Int {
+            val minutes = Duration.between(start, end).toMinutes().toInt()
+            return if (minutes <= 0) minutes + 24 * 60 else minutes
+        }
+
         private val EMAIL = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 
         /** Mirrors the validation rules of the TastyIgniter API (`ReservationRequest`). */
