@@ -97,7 +97,7 @@ class TastyIgniterApiTest {
             ReservationDraft(
                 locationId = 1, date = LocalDate.of(2026, 9, 25), time = LocalTime.of(19, 30), guestNum = 4,
                 firstName = " Erika ", lastName = "Mustermann", email = "erika@example.com",
-                telephone = "0301234", comment = "", tableIds = listOf(3, 4),
+                telephone = "0301234", comment = "", tableIds = listOf(3, 4), statusId = 6,
             ),
         )
 
@@ -110,13 +110,14 @@ class TastyIgniterApiTest {
         assertEquals("Erika", body["first_name"]!!.jsonPrimitive.content)
         assertEquals("4", body["guest_num"]!!.jsonPrimitive.content)
         assertEquals("[3,4]", body["tables"].toString())
+        assertEquals("6", body["status_id"]!!.jsonPrimitive.content)
     }
 
     @Test
     fun `omits blank email on create but sends it on update`() = runTest {
         server.enqueue(MockResponse().setResponseCode(201).setBody(MappersTest.SAMPLE_LIST))
         server.enqueue(MockResponse().setBody(MappersTest.SAMPLE_LIST))
-        val draft = ReservationDraft(locationId = 1, firstName = "Max", lastName = "Muster", telephone = "0151", email = " ")
+        val draft = ReservationDraft(locationId = 1, firstName = "Max", lastName = "Muster", telephone = "0151", email = " ", statusId = 6)
 
         api().createReservation(draft)
         api().updateReservation(12, draft)
@@ -125,6 +126,7 @@ class TastyIgniterApiTest {
         assertTrue("email" !in created)
         val updated = Json.parseToJsonElement(server.takeRequest().body.readUtf8()) as JsonObject
         assertEquals("", updated["email"]!!.jsonPrimitive.content)
+        assertTrue("status_id" !in updated)
     }
 
     @Test

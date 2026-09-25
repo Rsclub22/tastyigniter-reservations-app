@@ -1,5 +1,6 @@
 package io.github.rsclub22.tireservations.ui.edit
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -51,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -90,7 +92,13 @@ fun ReservationEditScreen(
     var showDate by remember { mutableStateOf(false) }
     var showTime by remember { mutableStateOf(false) }
 
-    LaunchedEffect(state.savedId) { state.savedId?.let { onSaved(it, state.isNew) } }
+    val context = LocalContext.current
+    LaunchedEffect(state.savedId) {
+        state.savedId?.let { id ->
+            state.warning?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show() }
+            onSaved(id, state.isNew)
+        }
+    }
     LaunchedEffect(state.unauthorized) { if (state.unauthorized) onUnauthorized() }
 
     Scaffold(

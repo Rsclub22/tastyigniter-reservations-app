@@ -58,6 +58,8 @@ data class ReservationDraft(
     val statusId: Long? = null,
 )
 
+data class CreateResult(val id: Long, val warning: String? = null)
+
 data class Location(val id: Long, val name: String)
 
 data class DiningTable(

@@ -3,6 +3,7 @@ package io.github.rsclub22.tireservations.ui.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.rsclub22.tireservations.data.ApiException
+import io.github.rsclub22.tireservations.data.CreateResult
 import io.github.rsclub22.tireservations.data.DiningTable
 import io.github.rsclub22.tireservations.data.Location
 import io.github.rsclub22.tireservations.data.ReservationDraft
@@ -28,6 +29,8 @@ data class EditState(
     val error: String? = null,
     val fieldErrors: Map<String, String> = emptyMap(),
     val savedId: Long? = null,
+    /** Shown after saving when the reservation was stored but a follow-up step failed. */
+    val warning: String? = null,
     val unauthorized: Boolean = false,
 )
 
@@ -109,9 +112,9 @@ class ReservationEditViewModel(
         viewModelScope.launch {
             runCatching {
                 if (reservationId == null) repository.create(s.draft)
-                else repository.update(reservationId, s.draft).let { reservationId }
-            }.onSuccess { id ->
-                _state.update { it.copy(saving = false, savedId = id) }
+                else repository.update(reservationId, s.draft).let { CreateResult(reservationId) }
+            }.onSuccess { result ->
+                _state.update { it.copy(saving = false, savedId = result.id, warning = result.warning) }
             }.onFailure { e ->
                 val fieldErrors = (e as? ApiException)?.fieldErrors.orEmpty()
                     .mapValues { (_, v) -> v.joinToString(" ") }

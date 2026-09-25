@@ -214,6 +214,8 @@ class TastyIgniterApi(
         put("first_name", firstName.trim())
         put("last_name", lastName.trim())
         if (email.isNotBlank() || isUpdate) put("email", email.trim())
+        // Status changes of existing reservations go through the status endpoint only.
+        if (!isUpdate) statusId?.let { put("status_id", it) }
         put("telephone", telephone.trim())
         put("comment", comment.trim())
         duration?.let { put("duration", it) }

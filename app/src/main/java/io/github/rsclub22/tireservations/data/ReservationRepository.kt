@@ -56,11 +56,21 @@ class ReservationRepository(
 
     suspend fun reservations(query: ReservationQuery) = api().reservations(query)
     suspend fun reservation(id: Long) = api().reservation(id)
-    suspend fun create(draft: ReservationDraft): Long {
+    /**
+     * Creates the reservation. The initial status is sent with the payload and then applied again
+     * through the status endpoint, which also writes the status history. If that second step fails
+     * the reservation already exists, so the error is returned as [CreateResult.warning] instead of
+     * thrown (a retry would create a duplicate).
+     */
+    suspend fun create(draft: ReservationDraft): CreateResult {
         val id = api().createReservation(draft)
-        // A status history entry is only written through the status endpoint.
-        draft.statusId?.let { runCatching { api().updateStatus(id, it, null, false) } }
-        return id
+        val statusId = draft.statusId ?: return CreateResult(id)
+        return try {
+            api().updateStatus(id, statusId, null, false)
+            CreateResult(id)
+        } catch (e: ApiException) {
+            CreateResult(id, "Reservierung angelegt, aber der Status konnte nicht gesetzt werden: ${e.message}")
+        }
     }
     suspend fun update(id: Long, draft: ReservationDraft) = api().updateReservation(id, draft)
     suspend fun delete(id: Long) = api().deleteReservation(id)
