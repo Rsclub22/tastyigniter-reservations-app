@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.TimerOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -47,6 +48,7 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -90,7 +92,8 @@ fun ReservationEditScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val d = state.draft
     var showDate by remember { mutableStateOf(false) }
-    var showTime by remember { mutableStateOf(false) }
+    // Which time the picker dialog edits: start or end of the stay.
+    var timePicker by remember { mutableStateOf<TimeTarget?>(null) }
 
     val context = LocalContext.current
     LaunchedEffect(state.savedId) {
@@ -135,21 +138,29 @@ fun ReservationEditScreen(
             if (state.locations.size > 1 || d.locationId == null) {
                 LocationDropdown(state, err["location_id"]) { id -> vm.edit { it.copy(locationId = id) } }
             }
+            PickerField(
+                label = "Datum",
+                value = d.date.format(LongDateFormat),
+                icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
+                error = err["reserve_date"],
+                onClick = { showDate = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 PickerField(
-                    label = "Datum",
-                    value = d.date.format(LongDateFormat),
-                    icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
-                    error = err["reserve_date"],
-                    onClick = { showDate = true },
-                    modifier = Modifier.weight(1.6f),
-                )
-                PickerField(
-                    label = "Uhrzeit",
+                    label = "Beginn",
                     value = d.time.display(),
                     icon = { Icon(Icons.Outlined.Schedule, contentDescription = null) },
                     error = err["reserve_time"],
-                    onClick = { showTime = true },
+                    onClick = { timePicker = TimeTarget.START },
+                    modifier = Modifier.weight(1f),
+                )
+                PickerField(
+                    label = "Ende",
+                    value = d.duration?.let { endLabel(d.time, it) } ?: "Standard",
+                    icon = { Icon(Icons.Outlined.TimerOff, contentDescription = null) },
+                    error = err["duration"],
+                    onClick = { timePicker = TimeTarget.END },
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -178,6 +189,7 @@ fun ReservationEditScreen(
                     onValueChange = vm::setDuration,
                     label = { Text("Dauer (Min.)") },
                     placeholder = { Text("Standard") },
+                    supportingText = { Text("oder Ende wählen") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.weight(1f),
@@ -274,20 +286,49 @@ fun ReservationEditScreen(
         ) { DatePicker(state = pickerState) }
     }
 
-    if (showTime) {
-        val timeState = rememberTimePickerState(initialHour = d.time.hour, initialMinute = d.time.minute, is24Hour = true)
+    timePicker?.let { target ->
+        val initial = when (target) {
+            TimeTarget.START -> d.time
+            // Without a duration, suggest two hours after the start.
+            TimeTarget.END -> d.time.plusMinutes((d.duration ?: 120).toLong())
+        }
+        // Keyed by target so the picker restarts from the right time for start and end.
+        val timeState = key(target) {
+            rememberTimePickerState(initialHour = initial.hour, initialMinute = initial.minute, is24Hour = true)
+        }
         AlertDialog(
-            onDismissRequest = { showTime = false },
-            title = { Text("Uhrzeit wählen") },
+            onDismissRequest = { timePicker = null },
+            title = { Text(if (target == TimeTarget.START) "Beginn wählen" else "Ende wählen") },
             text = { TimePicker(state = timeState) },
             confirmButton = {
                 TextButton(onClick = {
-                    vm.edit { it.copy(time = LocalTime.of(timeState.hour, timeState.minute)) }
-                    showTime = false
+                    val picked = LocalTime.of(timeState.hour, timeState.minute)
+                    // Moving the start keeps the duration, so the end moves along.
+                    if (target == TimeTarget.START) vm.edit { it.copy(time = picked) } else vm.setEnd(picked)
+                    timePicker = null
                 }) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = { showTime = false }) { Text("Abbrechen") } },
+            dismissButton = {
+                Row {
+                    if (target == TimeTarget.END && d.duration != null) {
+                        TextButton(onClick = { vm.setEnd(null); timePicker = null }) { Text("Standard") }
+                    }
+                    TextButton(onClick = { timePicker = null }) { Text("Abbrechen") }
+                }
+            },
         )
+    }
+}
+
+private enum class TimeTarget { START, END }
+
+/** End of the stay, with the number of days it runs past the start day. */
+private fun endLabel(start: LocalTime, durationMinutes: Int): String {
+    val end = start.plusMinutes(durationMinutes.toLong())
+    return end.display() + when (val days = ReservationEditViewModel.daysAfterStart(start, durationMinutes)) {
+        0 -> ""
+        1 -> " (+1 Tag)"
+        else -> " (+$days Tage)"
     }
 }
 

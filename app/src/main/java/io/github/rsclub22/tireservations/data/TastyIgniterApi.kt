@@ -258,7 +258,8 @@ class TastyIgniterApi(
         if (!isUpdate) statusId?.let { put("status_id", it) }
         put("telephone", telephone.trim())
         put("comment", comment.trim())
-        duration?.let { put("duration", it) }
+        // null means "location default": on update it must be sent to clear a custom duration.
+        if (duration != null || isUpdate) put("duration", duration)
         putJsonArray("tables") { tableIds.forEach { add(JsonPrimitive(it)) } }
         if (tableIds.isNotEmpty()) put("table_id", tableIds.first())
     }

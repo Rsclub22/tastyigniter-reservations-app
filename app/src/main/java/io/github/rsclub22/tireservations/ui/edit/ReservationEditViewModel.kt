@@ -15,7 +15,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Duration
 import java.time.LocalDate
+import java.time.LocalTime
 
 data class EditState(
     val isNew: Boolean,
@@ -97,6 +99,15 @@ class ReservationEditViewModel(
         }
     }
 
+    /** Sets the end time; the stay is stored as a duration, so it is converted into minutes. */
+    fun setEnd(end: LocalTime?) {
+        val draft = _state.value.draft
+        val minutes = end?.let { durationForEnd(draft.time, it, draft.duration) }
+        _state.update {
+            it.copy(durationText = minutes?.toString().orEmpty(), draft = it.draft.copy(duration = minutes))
+        }
+    }
+
     fun toggleTable(id: Long) = edit { d ->
         d.copy(tableIds = if (id in d.tableIds) d.tableIds - id else d.tableIds + id)
     }
@@ -131,6 +142,30 @@ class ReservationEditViewModel(
     }
 
     companion object {
+        /** Minutes from [start] to [end]; an end at or before the start is taken as the next day. */
+        fun durationBetween(start: LocalTime, end: LocalTime): Int {
+            val minutes = Duration.between(start, end).toMinutes().toInt()
+            return if (minutes <= 0) minutes + MINUTES_PER_DAY else minutes
+        }
+
+        /**
+         * Duration for a newly picked end time. The picker only knows a clock time:
+         * - stays under 24 hours end at the next occurrence of that time after the start;
+         * - longer stays keep the day they currently end on, so only the clock time changes.
+         */
+        fun durationForEnd(start: LocalTime, end: LocalTime, currentDuration: Int?): Int {
+            if (currentDuration == null || currentDuration < MINUTES_PER_DAY) return durationBetween(start, end)
+            val endDay = daysAfterStart(start, currentDuration)
+            val minutes = endDay * MINUTES_PER_DAY + (end.toSecondOfDay() - start.toSecondOfDay()) / 60
+            return if (minutes <= 0) minutes + MINUTES_PER_DAY else minutes
+        }
+
+        /** Number of days the stay ends after the start day (0 = same day). */
+        fun daysAfterStart(start: LocalTime, durationMinutes: Int): Int =
+            (start.toSecondOfDay() / 60 + durationMinutes) / MINUTES_PER_DAY
+
+        private const val MINUTES_PER_DAY = 24 * 60
+
         private val EMAIL = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 
         /** Mirrors the validation rules of the TastyIgniter API (`ReservationRequest`). */
