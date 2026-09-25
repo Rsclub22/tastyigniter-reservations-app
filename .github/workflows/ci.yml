@@ -137,13 +137,24 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           export VERSION_NAME="${VERSION_NAME#v}"
-          ./gradlew :app:assembleRelease :app:bundleRelease :shared:packageDeb
+          ./gradlew :app:assembleRelease :app:bundleRelease :shared:packageDeb :shared:createDistributable
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk "dist/ti-reservierungen-${VERSION_NAME}.apk"
           cp app/build/outputs/bundle/release/app-release.aab "dist/ti-reservierungen-${VERSION_NAME}.aab"
-          # Die Update-Prüfung der Desktop-Fassung sucht im Release nach einem
-          # Anhang mit der Endung .deb (s. UpdateChecker.assetSuffix).
           cp shared/build/compose/binaries/main/deb/*.deb "dist/"
+
+          # Das ausgepackte Programm als .tar.gz. Nur damit kann sich die
+          # Desktop-Fassung selbst erneuern: eine über die Paketverwaltung
+          # installierte Fassung gehört ihr, und ohne Root kommt die App dort
+          # nicht heran. Die Update-Prüfung sucht nach genau dieser Endung
+          # (s. Main.kt, assetSuffix).
+          tar czf "dist/ti-reservierungen-${VERSION_NAME}-linux-x64.tar.gz" \
+            -C shared/build/compose/binaries/main/app tastyigniter-reservierungen
+
+          # Prüfsumme daneben: die App spielt ohne sie nichts ein, weil ein
+          # abgebrochener Download sonst aussähe wie eine neue Fassung.
+          ( cd dist && sha256sum "ti-reservierungen-${VERSION_NAME}-linux-x64.tar.gz" \
+              > "ti-reservierungen-${VERSION_NAME}-linux-x64.tar.gz.sha256" )
 
       - name: GitHub-Release erstellen
         uses: softprops/action-gh-release@v3

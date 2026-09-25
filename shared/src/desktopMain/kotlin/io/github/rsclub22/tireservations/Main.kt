@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import io.github.rsclub22.tireservations.platform.Selbsterneuerung
 import io.github.rsclub22.tireservations.ui.theme.ReservationsTheme
 import io.github.rsclub22.tireservations.ui.update.AutoUpdatePrompt
 
@@ -30,14 +31,19 @@ private val appVersion: String = System.getProperty("app.version") ?: "dev"
 fun main() {
     AppGraph.init(
         debug = appVersion == "dev",
-        // Die Release-Strecke haengt .deb-Pakete an; die Update-Pruefung sucht daher
-        // nach dieser Endung und nicht nach der APK. Aus dem Entwicklungsstart
-        // heraus bleibt sie aus.
+        // Aus dem Entwicklungsstart heraus bleibt die Pruefung aus.
         updateRepo = if (appVersion == "dev") "" else "Rsclub22/tastyigniter-reservations-app",
         versionName = appVersion,
         userAgent = "TIReservations-Desktop",
-        assetSuffix = ".deb",
+        // Die Release-Strecke haengt neben dem .deb ein .tar.gz mit dem
+        // ausgepackten Programm an. Nur das laesst sich ohne Paketverwaltung und
+        // ohne Root einspielen - siehe Selbsterneuerung.
+        assetSuffix = ".tar.gz",
     )
+
+    // Was ein frueherer Tausch stehen liess: die alte Fassung lief damals noch
+    // aus ihrem Verzeichnis und konnte es nicht selbst loeschen.
+    Selbsterneuerung.raeumeAuf()
 
     starteWache()
 

@@ -103,6 +103,16 @@ private fun start(intent: Intent): Boolean = try {
  * Laeuft auf dem Hauptfaden - WebView laesst sich nirgendwo sonst erzeugen - und
  * braucht eine Activity, siehe [setzeAktiveActivity].
  */
+/**
+ * Am Telefon nie: das Einspielen eines Pakets verlangt REQUEST_INSTALL_PACKAGES
+ * und fuehrt durch einen Systemdialog. Die App bleibt deshalb beim Download im
+ * Browser, den der Benutzer selbst oeffnet.
+ */
+actual val kannSelbstErneuern: Boolean = false
+
+actual suspend fun erneuereSelbst(url: String): String? =
+    "Auf Android muss das Paket von Hand installiert werden."
+
 actual fun drucke(blatt: Tagesblatt, standort: String, gedrucktAm: String, titel: String): Boolean {
     val activity = aktiveActivity?.get() ?: return false
     val html = Druckblatt.html(blatt, standort, gedrucktAm)

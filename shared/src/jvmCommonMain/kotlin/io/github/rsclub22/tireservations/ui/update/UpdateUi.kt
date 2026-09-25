@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import io.github.rsclub22.tireservations.data.AppUpdate
 import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.data.UpdateChecker
+import io.github.rsclub22.tireservations.platform.erneuereSelbst
+import io.github.rsclub22.tireservations.platform.kannSelbstErneuern
 import io.github.rsclub22.tireservations.platform.openUrl
 import io.github.rsclub22.tireservations.ui.components.Meldungen
 import kotlinx.coroutines.flow.first
@@ -73,6 +75,8 @@ fun AutoUpdatePrompt(
  * Autoupdate anzudeuten, das es nicht gibt.
  */
 private fun hinweis(update: AppUpdate): String = when {
+    update.direkt && kannSelbstErneuern ->
+        "Die neue Fassung wird geladen, geprüft und eingespielt; danach startet das Programm neu."
     !update.direkt ->
         "Für dieses System hängt am Release kein fertiges Paket – die Release-Seite öffnet im Browser."
     update.endung.equals(".apk", ignoreCase = true) ->
@@ -89,8 +93,13 @@ fun UpdateDialog(
     onDismiss: () -> Unit,
     onLater: () -> Unit = onDismiss,
 ) {
+    var laeuft by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
     AlertDialog(
-        onDismissRequest = onDismiss,
+        // Waehrend des Einspielens nicht wegklickbar: das Verzeichnis wird gerade
+        // getauscht, da hilft es niemandem, den Fortschritt aus den Augen zu verlieren.
+        onDismissRequest = { if (!laeuft) onDismiss() },
         title = { Text("Update verfügbar: ${update.version}") },
         text = {
             Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
@@ -106,13 +115,31 @@ fun UpdateDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                if (!openUrl(update.downloadUrl)) {
-                    Meldungen.zeige("Kein Browser gefunden")
-                }
-                onDismiss()
-            }) { Text(if (update.direkt) "Herunterladen" else "Release öffnen") }
+            if (update.direkt && kannSelbstErneuern) {
+                TextButton(
+                    enabled = !laeuft,
+                    onClick = {
+                        laeuft = true
+                        scope.launch {
+                            // Kehrt nur zurueck, wenn es schiefging - sonst laeuft
+                            // schon die neue Fassung.
+                            val fehler = erneuereSelbst(update.downloadUrl)
+                            laeuft = false
+                            Meldungen.zeige(fehler ?: "Unerwartet zurückgekehrt.")
+                        }
+                    },
+                ) { Text(if (laeuft) "Wird eingespielt …" else "Einspielen und neu starten") }
+            } else {
+                TextButton(onClick = {
+                    if (!openUrl(update.downloadUrl)) {
+                        Meldungen.zeige("Kein Browser gefunden")
+                    }
+                    onDismiss()
+                }) { Text(if (update.direkt) "Herunterladen" else "Release öffnen") }
+            }
         },
-        dismissButton = { TextButton(onClick = onLater) { Text("Später") } },
+        dismissButton = {
+            TextButton(enabled = !laeuft, onClick = onLater) { Text("Später") }
+        },
     )
 }

@@ -32,6 +32,26 @@ expect fun composeMail(address: String, subject: String): Boolean
 expect fun openUrl(url: String): Boolean
 
 /**
+ * Kann diese Fassung sich selbst erneuern?
+ *
+ * Wahr nur fuer die ausgepackte Desktop-Fassung, und auch dort nur, wenn das
+ * Verzeichnis beschreibbar ist. Eine ueber die Paketverwaltung installierte
+ * Fassung gehoert der Paketverwaltung - da faengt die App nicht an, in /opt zu
+ * schreiben. Am Telefon ist es immer falsch: Android laesst eine App fremde
+ * Pakete nur mit eigener Berechtigung einspielen.
+ */
+expect val kannSelbstErneuern: Boolean
+
+/**
+ * Laedt das Paket, prueft die Pruefsumme, tauscht die Installation aus und
+ * startet neu.
+ *
+ * Kehrt nur zurueck, wenn es NICHT geklappt hat - dann mit der Meldung, die dem
+ * Benutzer gezeigt wird. Im Erfolgsfall laeuft schon die neue Fassung.
+ */
+expect suspend fun erneuereSelbst(url: String): String?
+
+/**
  * Druckt das Tagesblatt.
  *
  * Uebergeben werden die Daten und nicht fertiges HTML, weil beide Plattformen
