@@ -28,7 +28,7 @@ jobs:
           java-version: "17"
 
       # Also validates the Gradle wrapper checksum.
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Lint & Unit-Tests
         run: ./gradlew lintDebug testDebugUnitTest --stacktrace
@@ -71,7 +71,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Keystore aus Secrets bereitstellen
         env:
