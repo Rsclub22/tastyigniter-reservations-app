@@ -455,7 +455,7 @@ private fun VermerkBand(r: Reservation, onClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.onTertiaryContainer,
             )
             Text(
-                r.comment.ifBlank { "Ohne Text – dieser Tag ist für die Online-Buchung verriegelt." },
+                r.comment.ifBlank { "Ohne Text – diese Zeit ist für die Online-Buchung verriegelt." },
                 Modifier.padding(top = 4.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onTertiaryContainer,

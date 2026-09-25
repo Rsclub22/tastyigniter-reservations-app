@@ -121,7 +121,7 @@ class DruckblattTest {
                         gesperrt = true,
                         grund = "Nur nach Absprache",
                         sperrvermerke = listOf(
-                            Sperrvermerk(161, LocalTime.of(10, 0), 1234567, "WEIHNACHTEN: MAX 120 PAX."),
+                            Sperrvermerk(161, LocalTime.of(10, 0), 1234567, "WEIHNACHTEN: MAX 120 PAX.", ganztags = true),
                         ),
                         maxPax = 120,
                         paxJeZeit = mapOf("11:00" to 120, "13:00" to 120),

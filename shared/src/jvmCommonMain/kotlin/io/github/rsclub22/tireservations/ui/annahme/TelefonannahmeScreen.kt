@@ -352,12 +352,25 @@ private fun BelegungKarte(state: AnnahmeState, tag: Tagesdaten, vm: Telefonannah
                     containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                 ),
             ) {
-                Text(
-                    vermerk.kommentar.ifBlank { "Sperrvermerk ohne Text" },
-                    Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer,
-                )
+                Column(Modifier.padding(12.dp)) {
+                    Text(
+                        vermerk.kommentar.ifBlank { "Sperrvermerk ohne Text" },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                    // Ob nebenher noch angenommen werden darf, ist die Frage, die
+                    // am Telefon als Naechstes kommt.
+                    Text(
+                        if (vermerk.ganztags) {
+                            "Der ganze Tag ist verplant – angenommen wird ohne Tisch."
+                        } else {
+                            "Nur diese Zeit ist verplant – sonst wird wie gewohnt mit Tisch angenommen."
+                        },
+                        Modifier.padding(top = 6.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                }
             }
         }
 

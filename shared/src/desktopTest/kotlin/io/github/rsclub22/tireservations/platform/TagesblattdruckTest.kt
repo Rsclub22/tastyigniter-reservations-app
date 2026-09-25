@@ -117,6 +117,7 @@ class TagesblattdruckTest {
             zeit = LocalTime.of(11, 0),
             gaeste = 999,
             kommentar = "2 Gänge: 11 Uhr und 13 Uhr, Anmeldung bis 20.12., MAX 120 PAX",
+            ganztags = true,
         )
 
         val ohne = Tagesblattdruck(blatt(40), "Gasthaus", "24.12.2026").seitenzahl(format)

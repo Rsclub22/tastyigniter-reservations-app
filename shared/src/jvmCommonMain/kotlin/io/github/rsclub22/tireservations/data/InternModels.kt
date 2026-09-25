@@ -72,15 +72,21 @@ data class Raum(
 )
 
 /**
- * Ein Sperrvermerk: eine Pseudo-Reservierung, die einen Tag gegen die
- * Online-Buchung verriegelt. Der [kommentar] ist am Telefon oft die wichtigste
- * Angabe des Tages - dort stehen die Essenszeiten und die Höchstzahl.
+ * Ein Sperrvermerk: eine Pseudo-Reservierung, die Zeit gegen die Online-Buchung
+ * verriegelt. Der [kommentar] ist am Telefon oft die wichtigste Angabe des
+ * Tages - dort stehen die Essenszeiten und die Höchstzahl.
+ *
+ * [ganztags] sagt, wie weit er reicht: ein Weihnachtsvermerk über der Mittagszeit
+ * nimmt den Tag ein, ein Märchenabend um 17 Uhr lässt den Mittagstisch offen.
+ * Entschieden wird das am Server anhand der Öffnungszeiten - hier wird es nur
+ * angezeigt.
  */
 data class Sperrvermerk(
     val id: Long,
     val zeit: LocalTime?,
     val gaeste: Int,
     val kommentar: String,
+    val ganztags: Boolean,
 )
 
 /** Eine Reservierung, wie die Telefonannahme sie auflistet. */
@@ -344,6 +350,9 @@ internal object InternMappers {
         zeit = zeit(o.string("zeit")),
         gaeste = o.int("gaeste") ?: 0,
         kommentar = o.string("kommentar").orEmpty(),
+        // Ältere Serverstände kennen das Feld nicht; dort galt jeder Vermerk
+        // für den ganzen Tag.
+        ganztags = o.bool("ganztags") ?: true,
     )
 
     fun reservierung(o: JsonObject) = InternReservierung(
