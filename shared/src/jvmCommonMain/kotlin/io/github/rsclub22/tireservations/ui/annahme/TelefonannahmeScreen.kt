@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -290,30 +291,48 @@ private fun Raumwahl(state: AnnahmeState, vm: TelefonannahmeViewModel, modifier:
 private fun Sperrbereich(state: AnnahmeState, vm: TelefonannahmeViewModel, breit: Boolean) {
     val gesperrt = state.tag?.gesperrt == true
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
+    // Auf dem Telefon untereinander: nebeneinander bleibt fuer das Feld so wenig
+    // Platz, dass schon der Platzhalter ueber mehrere Zeilen bricht.
+    val feld: @Composable (Modifier) -> Unit = { m ->
         if (!gesperrt) {
             OutlinedTextField(
                 value = state.grund,
                 onValueChange = vm::setGrund,
-                placeholder = { Text("Grund (optional), z. B. Betriebsferien") },
+                label = { Text("Grund (optional)") },
+                placeholder = { Text("z. B. Betriebsferien") },
                 singleLine = true,
-                modifier = Modifier.weight(1f),
+                modifier = m,
             )
         } else {
             Text(
                 "Dieser Tag ist gesperrt" + state.tag.grund.takeIf { it.isNotBlank() }
                     ?.let { ": $it" }.orEmpty(),
-                Modifier.weight(1f),
+                m,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
             )
         }
+    }
 
+    @Suppress("NAME_SHADOWING")
+    val knopf: @Composable () -> Unit = {
         OutlinedButton(onClick = vm::sperreUmschalten, enabled = !state.sperrtLaeuft) {
             Text(if (gesperrt) "Freigeben" else "Diesen Tag sperren")
+        }
+    }
+
+    if (breit) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            feld(Modifier.weight(1f))
+            knopf()
+        }
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            feld(Modifier.fillMaxWidth())
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { knopf() }
         }
     }
 
@@ -411,9 +430,28 @@ private fun BelegungKarte(state: AnnahmeState, tag: Tagesdaten, vm: Telefonannah
         }
 
         Text(
-            "Ein Klick auf die Uhrzeit nimmt die Reservierung mit den unten eingetragenen Daten an. " +
-                "Grau bedeutet: für ${state.gaeste} " +
-                (if (state.gaeste == 1) "Person" else "Personen") + " ist kein Tisch mehr frei.",
+            buildString {
+                append("Ein Klick auf die Uhrzeit nimmt die Reservierung mit den unten eingetragenen Daten an. ")
+
+                // Der Tag kann gemischt sein: ein Abendvermerk laesst den
+                // Mittagstisch offen. Dann steht hier beides, sonst raet man am
+                // Telefon, warum manche Zeiten keinen Tisch bekommen.
+                val vermerke = state.tag?.vermerke.orEmpty()
+                when {
+                    vermerke.any { it.ganztags } ->
+                        append("An diesem Tag wird ohne Tisch angenommen – die Verteilung macht der Tischplan. ")
+                    vermerke.isNotEmpty() ->
+                        append("Zu den Zeiten des Sperrvermerks wird ohne Tisch angenommen, sonst wie gewohnt mit Tisch. ")
+                }
+
+                if (state.tag?.belegung?.any { it.paxMax != null } == true) {
+                    append("Die Zahl unter der Uhrzeit sind die bereits vergebenen von den vorgesehenen Plätzen. ")
+                }
+
+                append("Grau bedeutet: für ${state.gaeste} ")
+                append(if (state.gaeste == 1) "Person" else "Personen")
+                append(" ist dort nichts mehr frei.")
+            },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
