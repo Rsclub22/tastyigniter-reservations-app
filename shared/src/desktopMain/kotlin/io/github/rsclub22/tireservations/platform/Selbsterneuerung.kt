@@ -26,6 +26,9 @@ internal object Selbsterneuerung {
     /** Dateiendung der alten Fassung, die nach dem Tausch stehen bleibt. */
     private const val ALT = ".alt"
 
+    /** So lange wird dem Nachfolger zugesehen, bevor dieser Prozess geht. */
+    private const val START_WARTEZEIT_S = 4L
+
     /**
      * Das Verzeichnis der Installation - also das mit bin/ und lib/ darin.
      *
@@ -77,15 +80,54 @@ internal object Selbsterneuerung {
         val starter = starter(wurzel)
             ?: return@withContext "Nach dem Tausch war kein Starter zu finden."
 
-        // Der Nachfolger darf nicht am beendeten Prozess haengen, sonst geht er
-        // mit ihm unter.
-        ProcessBuilder(starter.absolutePath)
-            .directory(wurzel)
-            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
-            .redirectError(ProcessBuilder.Redirect.DISCARD)
-            .start()
+        starteNeu(starter, wurzel)?.let { return@withContext it }
 
         exitProcess(0)
+    }
+
+    /**
+     * Startet die neue Fassung und kehrt erst zurueck, wenn sie wirklich laeuft.
+     *
+     * Zwei Dinge gehen hier sonst schief, und beide sahen in der Probe gleich aus:
+     * die Anwendung war weg und kam nicht wieder.
+     *
+     * Erstens die Sitzung. Ein einfach abgespaltener Nachfolger bleibt in der
+     * Sitzung des Elternprozesses und geht mit ihm unter - je nachdem, woraus die
+     * Anwendung gestartet wurde. `setsid` gibt ihm eine eigene.
+     *
+     * Zweitens die Eile. Die Uebergabe an das neue Programm laeuft ueber eine
+     * Pipe zum Elternprozess; verschwindet der im selben Atemzug, kommt der
+     * Nachfolger nicht mehr dazu, sich zu ersetzen. Deshalb wird gewartet, bis er
+     * steht - und wenn er es nicht tut, wird das gesagt, statt sich wortlos zu
+     * beenden.
+     *
+     * @return Fehlermeldung, oder null wenn der Nachfolger laeuft
+     */
+    private fun starteNeu(starter: File, wurzel: File): String? {
+        // Erst mit eigener Sitzung; gibt es setsid nicht, eben ohne.
+        val versuche = listOf(
+            listOf("setsid", starter.absolutePath),
+            listOf(starter.absolutePath),
+        )
+
+        for (befehl in versuche) {
+            val kind = runCatching {
+                ProcessBuilder(befehl)
+                    .directory(wurzel)
+                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .start()
+            }.getOrNull() ?: continue
+
+            // Laeuft nach der Wartezeit noch: gut, das ist die neue Fassung.
+            if (!kind.waitFor(START_WARTEZEIT_S, TimeUnit.SECONDS)) return null
+
+            // setsid spaltet ab und beendet sich dann selbst - auch das ist Erfolg.
+            if (befehl.first() == "setsid" && kind.exitValue() == 0) return null
+        }
+
+        return "Die neue Fassung ist eingespielt, ließ sich aber nicht starten. " +
+            "Bitte das Programm von Hand starten."
     }
 
     /**
