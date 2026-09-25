@@ -37,3 +37,15 @@ expect fun openUrl(url: String): Boolean
  * @return false, wenn dafuer nichts eingerichtet ist.
  */
 expect fun drucke(html: String, titel: String): Boolean
+
+/**
+ * Meldet sich beim Betriebssystem - Benachrichtigungsleiste am Telefon,
+ * System-Ablage auf dem Desktop.
+ *
+ * @param kennung gleiche Kennung ersetzt eine noch stehende Meldung, statt eine
+ *   zweite danebenzulegen.
+ * @return false, wenn das System keine Meldungen annimmt. Unter Wayland gibt es
+ *   die AWT-Ablage oft nicht, und auf Android kann die Erlaubnis fehlen; der
+ *   Aufrufer weicht dann auf eine Meldung in der App aus.
+ */
+expect fun melde(titel: String, text: String, kennung: Int): Boolean

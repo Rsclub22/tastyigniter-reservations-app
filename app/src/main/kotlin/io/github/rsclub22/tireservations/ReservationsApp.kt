@@ -2,6 +2,7 @@ package io.github.rsclub22.tireservations
 
 import android.app.Application
 import io.github.rsclub22.tireservations.data.isFromPlayStore
+import io.github.rsclub22.tireservations.hintergrund.Wachposten
 import io.github.rsclub22.tireservations.platform.initAndroidPlatform
 
 /**
@@ -26,6 +27,9 @@ class ReservationsApp : Application() {
             userAgent = "TIReservations-Android",
             assetSuffix = ".apk",
         )
+
+        // Auch bei geschlossener App nach neuen unbestaetigten Reservierungen sehen.
+        Wachposten.einplanen(this)
     }
 
     /** Wird unter Einstellungen angezeigt. */

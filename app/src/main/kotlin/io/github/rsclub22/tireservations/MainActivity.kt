@@ -1,6 +1,10 @@
 package io.github.rsclub22.tireservations
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import androidx.core.content.ContextCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,6 +24,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Das Drucken braucht eine Activity, nicht den Anwendungskontext.
         setzeAktiveActivity(this)
+        frageMeldeerlaubnis()
         val app = application as ReservationsApp
         setContent {
             ReservationsTheme {
@@ -47,5 +52,22 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         setzeAktiveActivity(null)
         super.onDestroy()
+    }
+
+    /**
+     * Ab Android 13 muss der Benutzer Meldungen erlauben. Ohne die Erlaubnis
+     * verwirft das System sie stillschweigend - dann bliebe unklar, warum nie
+     * etwas kommt. Einmal fragen genuegt; lehnt jemand ab, weicht die App auf
+     * eine Meldung im Programm aus.
+     */
+    private fun frageMeldeerlaubnis() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+
+        val erteilt = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+
+        if (!erteilt) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+        }
     }
 }

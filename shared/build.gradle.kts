@@ -69,6 +69,10 @@ kotlin {
 
         androidMain.dependencies {
             implementation(libs.kotlinx.coroutines.android)
+            // NotificationCompat fuer die Meldungen
+            implementation(libs.androidx.core.ktx)
+            // Nachsehen, auch wenn die App zu ist
+            implementation(libs.androidx.work.runtime.ktx)
         }
 
         getByName("desktopMain").dependencies {

@@ -10,7 +10,13 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import io.github.rsclub22.tireservations.ui.AppNavigation
+import io.github.rsclub22.tireservations.ui.components.Meldungen
 import io.github.rsclub22.tireservations.ui.components.MeldungsHost
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import io.github.rsclub22.tireservations.ui.theme.ReservationsTheme
 import io.github.rsclub22.tireservations.ui.update.AutoUpdatePrompt
 
@@ -32,6 +38,8 @@ fun main() {
         userAgent = "TIReservations-Desktop",
         assetSuffix = ".deb",
     )
+
+    starteWache()
 
     application {
         val state = rememberWindowState(
@@ -63,6 +71,30 @@ fun main() {
                     MeldungsHost()
                 }
             }
+        }
+    }
+}
+
+/**
+ * Sieht regelmaessig nach neuen unbestaetigten Reservierungen.
+ *
+ * Auf dem Desktop reicht eine Schleife: das Programm laeuft auf dem Tresenrechner
+ * ohnehin den ganzen Tag. Eine Minute ist nah genug am Geschehen und belastet den
+ * Pi nicht - der Endpunkt liefert nur Zahlen und die wenigen offenen Eintraege.
+ *
+ * Findet das System keine Ablage fuer Meldungen - unter Wayland ist die AWT-Ablage
+ * oft nicht da -, wird die Meldung stattdessen in der App gezeigt.
+ */
+private fun starteWache() {
+    CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
+        while (true) {
+            val ergebnis = AppGraph.wachdienst.nachsehen()
+
+            if (ergebnis != null && ergebnis.neue > 0 && !ergebnis.gemeldet) {
+                Meldungen.zeige("${ergebnis.titel}: ${ergebnis.text.lineSequence().first()}")
+            }
+
+            delay(60_000)
         }
     }
 }

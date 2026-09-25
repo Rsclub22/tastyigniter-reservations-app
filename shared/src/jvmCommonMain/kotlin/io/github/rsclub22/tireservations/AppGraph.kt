@@ -3,6 +3,7 @@ package io.github.rsclub22.tireservations
 import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.data.UpdateChecker
+import io.github.rsclub22.tireservations.data.Wachdienst
 import io.github.rsclub22.tireservations.data.createSettingsDataStore
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -30,10 +31,17 @@ object AppGraph {
     lateinit var updateChecker: UpdateChecker
         private set
 
+    /** Sieht nach, ob ueber das oeffentliche Formular etwas hereingekommen ist. */
+    lateinit var wachdienst: Wachdienst
+        private set
+
     /** Die automatische Update-Prüfung läuft einmal je App-Start. */
     var updateCheckedThisSession = false
 
     private var initialised = false
+
+    /** Stehen die Abhaengigkeiten schon? Fuer Aufrufer ausserhalb der Oberflaeche. */
+    val bereit: Boolean get() = initialised
 
     /**
      * @param updateRepo `owner/name` des GitHub-Repositories; leer schaltet die
@@ -68,6 +76,7 @@ object AppGraph {
 
         settingsStore = SettingsStore(createSettingsDataStore())
         repository = ReservationRepository(settingsStore, httpClient)
+        wachdienst = Wachdienst(repository, settingsStore)
         updateChecker = UpdateChecker(
             httpClient,
             updateRepo,

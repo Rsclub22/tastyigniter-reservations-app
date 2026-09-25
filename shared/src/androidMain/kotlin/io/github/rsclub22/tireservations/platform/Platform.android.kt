@@ -1,10 +1,13 @@
 package io.github.rsclub22.tireservations.platform
 
+import android.app.Activity
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.app.Activity
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -12,6 +15,8 @@ import android.print.PrintAttributes
 import android.print.PrintManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import java.io.File
 import java.lang.ref.WeakReference
 
@@ -117,3 +122,47 @@ actual fun drucke(html: String, titel: String): Boolean {
 
     return true
 }
+
+/** Ein eigener Kanal, damit sich die Meldungen im System einzeln abschalten lassen. */
+private const val KANAL = "neue-reservierungen"
+
+actual fun melde(titel: String, text: String, kennung: Int): Boolean = runCatching {
+    val verwalter = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        ?: return false
+
+    if (verwalter.getNotificationChannel(KANAL) == null) {
+        verwalter.createNotificationChannel(
+            NotificationChannel(KANAL, "Neue Reservierungen", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Meldet Reservierungen, die über das Formular hereinkommen und noch zu bestätigen sind."
+            },
+        )
+    }
+
+    // Ein Tippen oeffnet die App. Ohne das fuehrt die Meldung ins Leere.
+    val oeffnen = appContext.packageManager.getLaunchIntentForPackage(appContext.packageName)
+        ?.let {
+            PendingIntent.getActivity(
+                appContext, 0, it,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
+
+    val meldung = NotificationCompat.Builder(appContext, KANAL)
+        .setSmallIcon(android.R.drawable.ic_dialog_info)
+        .setContentTitle(titel)
+        .setContentText(text)
+        .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+        .setAutoCancel(true)
+        .apply { oeffnen?.let { setContentIntent(it) } }
+        .build()
+
+    // Ab Android 13 braucht es die Erlaubnis POST_NOTIFICATIONS. Fehlt sie, verwirft
+    // das System die Meldung stillschweigend - deshalb hier nachsehen und dem
+    // Aufrufer die Wahrheit sagen, damit er auf eine Meldung in der App ausweicht.
+    if (!NotificationManagerCompat.from(appContext).areNotificationsEnabled()) {
+        return false
+    }
+
+    NotificationManagerCompat.from(appContext).notify(kennung, meldung)
+    true
+}.getOrDefault(false)

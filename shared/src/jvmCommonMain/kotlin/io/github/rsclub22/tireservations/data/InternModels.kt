@@ -86,6 +86,8 @@ data class Sperrvermerk(
 /** Eine Reservierung, wie die Telefonannahme sie auflistet. */
 data class InternReservierung(
     val id: Long,
+    /** Nur bei Meldungen gesetzt - im Tages-Zusammenhang kennt man den Tag schon. */
+    val datum: LocalDate? = null,
     val zeit: LocalTime?,
     val dauer: Int,
     val gaeste: Int,
@@ -212,6 +214,26 @@ data class Monatsuebersicht(
 }
 
 /**
+ * Unbestaetigte Reservierungen - `GET intern/offen`.
+ *
+ * Zwei Zahlen mit verschiedenem Zweck: [anzahl] sind die seit dem Merker
+ * hinzugekommenen, dafuer wird gemeldet. [offenGesamt] sind alle unbestaetigten,
+ * dafuer steht die Markierung in der Liste.
+ */
+data class OffeneReservierungen(
+    val seit: Long,
+    /**
+     * Die hoechste vergebene Nummer, nicht die der neuesten unbestaetigten. Der
+     * Merker rueckt daran vor - sonst kaeme dieselbe Meldung wieder, sobald
+     * zwischendurch nur bestaetigte Reservierungen dazukommen.
+     */
+    val hoechsteId: Long,
+    val anzahl: Int,
+    val offenGesamt: Int,
+    val reservierungen: List<InternReservierung>,
+)
+
+/**
  * Wandelt die Antworten um. Von Hand wie im übrigen Datenlayer, damit ein
  * fehlendes oder unerwartetes Feld eine harmlose Vorgabe ergibt und nicht die
  * ganze Antwort verwirft.
@@ -235,6 +257,14 @@ internal object InternMappers {
         maxPax = o.int("max_pax"),
         paxJeZeit = zahlmap(o["pax_je_zeit"]),
         hausgroesse = o.int("hausgroesse") ?: 0,
+        reservierungen = objekte(o["reservierungen"]).map(::reservierung),
+    )
+
+    fun offen(o: JsonObject): OffeneReservierungen = OffeneReservierungen(
+        seit = o.long("seit") ?: 0,
+        hoechsteId = o.long("hoechste_id") ?: 0,
+        anzahl = o.int("anzahl") ?: 0,
+        offenGesamt = o.int("offen_gesamt") ?: 0,
         reservierungen = objekte(o["reservierungen"]).map(::reservierung),
     )
 
@@ -311,6 +341,7 @@ internal object InternMappers {
 
     fun reservierung(o: JsonObject) = InternReservierung(
         id = o.long("id") ?: 0,
+        datum = datum(o.string("datum")),
         zeit = zeit(o.string("zeit")),
         dauer = o.int("dauer") ?: 0,
         gaeste = o.int("gaeste") ?: 0,

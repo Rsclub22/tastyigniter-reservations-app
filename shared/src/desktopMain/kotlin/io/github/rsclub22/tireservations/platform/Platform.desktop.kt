@@ -84,3 +84,47 @@ actual fun drucke(html: String, titel: String): Boolean = runCatching {
 
     browse(datei.toURI())
 }.getOrDefault(false)
+
+/**
+ * Das Symbol in der System-Ablage. Wird beim ersten Melden angelegt und bleibt
+ * dann stehen - jedes Mal ein neues anzulegen fuellt die Leiste.
+ */
+private var ablageSymbol: java.awt.TrayIcon? = null
+
+actual fun melde(titel: String, text: String, kennung: Int): Boolean = runCatching {
+    if (!java.awt.SystemTray.isSupported()) return false
+
+    val ablage = java.awt.SystemTray.getSystemTray()
+    val symbol = ablageSymbol ?: java.awt.TrayIcon(symbolbild(), "Reservierungen").also {
+        it.isImageAutoSize = true
+        ablage.add(it)
+        ablageSymbol = it
+    }
+
+    symbol.displayMessage(titel, text, java.awt.TrayIcon.MessageType.INFO)
+    true
+}.getOrDefault(false)
+
+/**
+ * Ein kleines Symbol, gezeichnet statt mitgeliefert: eine Bilddatei waere die
+ * einzige Ressource des Desktop-Ziels und muesste durch die Paketierung getragen
+ * werden, nur fuer sechzehn Pixel.
+ */
+private fun symbolbild(): java.awt.Image {
+    val groesse = 16
+    val bild = java.awt.image.BufferedImage(groesse, groesse, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+    val stift = bild.createGraphics()
+    stift.setRenderingHint(
+        java.awt.RenderingHints.KEY_ANTIALIASING,
+        java.awt.RenderingHints.VALUE_ANTIALIAS_ON,
+    )
+    // Das Braun des Hauses, wie im Theme.
+    stift.color = java.awt.Color(0x60, 0x21, 0x0F)
+    stift.fillRoundRect(1, 1, groesse - 2, groesse - 2, 5, 5)
+    stift.color = java.awt.Color.WHITE
+    stift.fillRect(4, 6, groesse - 8, 2)
+    stift.fillRect(4, 10, groesse - 8, 2)
+    stift.dispose()
+
+    return bild
+}

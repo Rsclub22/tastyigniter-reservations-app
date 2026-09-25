@@ -18,6 +18,12 @@ data class AppSettings(
     val defaultLocationId: Long? = null,
     /** Update the user chose "Später" for; not offered again automatically. */
     val skippedUpdateVersion: String? = null,
+    /**
+     * Hoechste Reservierungsnummer, die beim Pruefen auf neue unbestaetigte schon
+     * gesehen wurde. Eine Nummer und keine Uhrzeit, weil der Server created_at auf
+     * das Datum kuerzt.
+     */
+    val letzteGesehene: Long = 0,
 ) {
     val isLoggedIn: Boolean get() = !token.isNullOrBlank() && baseUrl.isNotBlank()
 }
@@ -32,6 +38,7 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         val userName = stringPreferencesKey("user_name")
         val defaultLocation = longPreferencesKey("default_location")
         val skippedUpdate = stringPreferencesKey("skipped_update")
+        val letzteGesehene = longPreferencesKey("letzte_gesehene")
     }
 
     val settings: Flow<AppSettings> = dataStore.data.map { it.toSettings() }
@@ -44,6 +51,7 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         userName = this[Keys.userName],
         defaultLocationId = this[Keys.defaultLocation],
         skippedUpdateVersion = this[Keys.skippedUpdate],
+        letzteGesehene = this[Keys.letzteGesehene] ?: 0,
     )
 
     suspend fun saveLogin(baseUrl: String, email: String, isAdmin: Boolean, token: String, userName: String?) {
@@ -64,6 +72,10 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
 
     suspend fun skipUpdate(version: String) {
         dataStore.edit { it[Keys.skippedUpdate] = version }
+    }
+
+    suspend fun merkeGesehen(id: Long) {
+        dataStore.edit { it[Keys.letzteGesehene] = id }
     }
 
     suspend fun logout() {

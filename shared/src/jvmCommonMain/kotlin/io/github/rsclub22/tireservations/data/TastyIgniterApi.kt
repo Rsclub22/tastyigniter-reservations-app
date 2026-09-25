@@ -272,6 +272,21 @@ class TastyIgniterApi(
         return InternMappers.monat(objekt(send("GET", url)))
     }
 
+    /**
+     * Unbestaetigte Reservierungen, also die ueber das oeffentliche Formular.
+     *
+     * @param seit Reservierungsnummer, keine Uhrzeit: das Model auf dem Server kuerzt
+     *   created_at auf das Datum, nach der Zeit liesse sich "neu seit zuletzt" nicht
+     *   beantworten.
+     */
+    suspend fun internOffen(seit: Long): OffeneReservierungen {
+        val url = url("intern/offen").newBuilder()
+            .addQueryParameter("seit", seit.toString())
+            .build()
+
+        return InternMappers.offen(objekt(send("GET", url)))
+    }
+
     /** Einen Tag gegen die Online-Buchung sperren. Gibt die neue Liste zurück. */
     suspend fun internSperren(datum: LocalDate, grund: String = ""): Map<String, String> {
         val body = buildJsonObject {
