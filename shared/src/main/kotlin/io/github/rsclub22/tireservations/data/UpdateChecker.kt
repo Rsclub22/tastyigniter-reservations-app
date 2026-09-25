@@ -1,7 +1,5 @@
 package io.github.rsclub22.tireservations.data
 
-import android.content.Context
-import android.os.Build
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -21,7 +19,7 @@ data class AppUpdate(
 
 /**
  * Looks for a newer signed release on GitHub (`/releases/latest`, which skips drafts and
- * pre-releases). Installs from the Play Store are updated by the store instead, see [isFromPlayStore].
+ * pre-releases). Installs from the Play Store are updated by the store and should not check.
  *
  * @param repo `owner/name` of the GitHub repository; blank disables the check.
  */
@@ -87,17 +85,5 @@ class UpdateChecker(
                 .split('.')
                 .map { it.toIntOrNull() ?: 0 }
 
-        /** True if the Play Store installed the app; then it handles updates itself. */
-        fun isFromPlayStore(context: Context): Boolean {
-            val installer = runCatching {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
-                } else {
-                    @Suppress("DEPRECATION")
-                    context.packageManager.getInstallerPackageName(context.packageName)
-                }
-            }.getOrNull()
-            return installer == "com.android.vending"
-        }
     }
 }

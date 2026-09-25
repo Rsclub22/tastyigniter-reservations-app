@@ -68,12 +68,12 @@ import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.ui.components.ErrorCard
 import io.github.rsclub22.tireservations.ui.components.LoadingBox
-import io.github.rsclub22.tireservations.ui.components.LongDateFormat
+import io.github.rsclub22.tireservations.format.LongDateFormat
 import io.github.rsclub22.tireservations.ui.components.StatusBadge
-import io.github.rsclub22.tireservations.ui.components.display
+import io.github.rsclub22.tireservations.format.display
 import io.github.rsclub22.tireservations.ui.components.parseHexColor
-import io.github.rsclub22.tireservations.ui.components.relativeDayLabel
-import io.github.rsclub22.tireservations.ui.components.statusLabel
+import io.github.rsclub22.tireservations.format.relativeDayLabel
+import io.github.rsclub22.tireservations.format.statusLabel
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset

@@ -31,7 +31,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
 
       - name: Lint & Unit-Tests
-        run: ./gradlew lintDebug testDebugUnitTest --stacktrace
+        run: ./gradlew lintDebug testDebugUnitTest :shared:test :desktop:test --stacktrace
 
       - name: Debug-APK bauen
         env:
@@ -52,13 +52,42 @@ jobs:
           name: reports
           path: |
             app/build/reports/lint-results-debug.html
-            app/build/reports/tests/
+            shared/build/reports/tests/
+            desktop/build/reports/tests/
+          retention-days: 14
+
+  desktop:
+    name: Linux-Desktop-Paket (.deb)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      # jpackage needs fakeroot to build .deb packages.
+      - name: Paketwerkzeuge installieren
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fakeroot
+
+      - name: .deb bauen
+        run: ./gradlew :desktop:packageDeb
+
+      - name: .deb hochladen
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-deb
+          path: desktop/build/compose/binaries/main/deb/*.deb
           retention-days: 14
 
   release:
     name: Signiertes Release
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [build, desktop]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -73,6 +102,9 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      - name: Paketwerkzeuge installieren
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fakeroot
+
       - name: Keystore aus Secrets bereitstellen
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -84,7 +116,7 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
           echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
-      - name: Release-APK und -AAB bauen
+      - name: Release-APK, -AAB und Desktop-.deb bauen
         env:
           VERSION_NAME: ${{ github.ref_name }}
           VERSION_CODE: ${{ github.run_number }}
@@ -93,10 +125,11 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           export VERSION_NAME="${VERSION_NAME#v}"
-          ./gradlew assembleRelease bundleRelease
+          ./gradlew assembleRelease bundleRelease :desktop:packageDeb
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk "dist/ti-reservierungen-${VERSION_NAME}.apk"
           cp app/build/outputs/bundle/release/app-release.aab "dist/ti-reservierungen-${VERSION_NAME}.aab"
+          cp desktop/build/compose/binaries/main/deb/*.deb dist/
 
       - name: GitHub-Release erstellen
         uses: softprops/action-gh-release@v3

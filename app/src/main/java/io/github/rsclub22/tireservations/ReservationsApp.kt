@@ -1,6 +1,8 @@
 package io.github.rsclub22.tireservations
 
 import android.app.Application
+import android.os.Build
+import io.github.rsclub22.tireservations.data.InstallSource
 import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.data.UpdateChecker
@@ -26,11 +28,13 @@ class ReservationsApp : Application() {
             .build()
     }
 
-    val repository by lazy { ReservationRepository(settingsStore, httpClient) }
+    val repository by lazy {
+        ReservationRepository(settingsStore, httpClient, "Android ${Build.MANUFACTURER} ${Build.MODEL}")
+    }
 
     val updateChecker by lazy {
         // Play Store installs are updated by the store; only sideloaded APKs check GitHub.
-        val repo = if (UpdateChecker.isFromPlayStore(this)) "" else BuildConfig.UPDATE_REPO
+        val repo = if (InstallSource.isFromPlayStore(this)) "" else BuildConfig.UPDATE_REPO
         UpdateChecker(httpClient, repo, BuildConfig.VERSION_NAME)
     }
 

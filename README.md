@@ -57,34 +57,48 @@ Die Release-App meldet neue Versionen selbst (*Einstellungen → Nach Updates su
 Beide Vertriebswege (GitHub-Releases und Google Play Store) sind in
 [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md) Schritt für Schritt beschrieben.
 
+## Linux-Desktop-Client (Grundgerüst)
+
+Ein Desktop-Client auf Basis von Compose Multiplatform nutzt denselben Kern (`:shared`) wie die
+Android-App. Er kann derzeit anmelden und die Reservierungen eines Tages anzeigen (Datum blättern,
+aktualisieren, abmelden); Anlegen, Bearbeiten und Status ändern folgen.
+
+- Installation: `.deb` aus den Releases bzw. dem CI-Artefakt `desktop-deb`, dann
+  `sudo apt install ./ti-reservierungen_*.deb`. Die Java-Laufzeit ist im Paket enthalten.
+- Einstellungen und Anmeldetoken liegen in `~/.config/ti-reservierungen/settings.json`
+  (nur für den eigenen Benutzer lesbar).
+
 ## Entwicklung
 
-- Kotlin, Jetpack Compose, Material 3, OkHttp, kotlinx.serialization, DataStore
-- `minSdk` 26 (Android 8.0), `targetSdk` 36
-- JDK 17+ und Android SDK erforderlich
+- Kotlin, Jetpack Compose / Compose Multiplatform, Material 3, OkHttp, kotlinx.serialization
+- Android: `minSdk` 26 (Android 8.0), `targetSdk` 36, `compileSdk` 37
+- JDK 17+ und Android SDK erforderlich; für `.deb`-Pakete zusätzlich `fakeroot`
 
 ```bash
-./gradlew assembleDebug          # Debug-APK: app/build/outputs/apk/debug/
-./gradlew testDebugUnitTest      # Unit-Tests (JSON-Parsing, API-Client, Validierung)
-./gradlew lintDebug              # Android Lint
+./gradlew assembleDebug            # Debug-APK: app/build/outputs/apk/debug/
+./gradlew :shared:test             # Unit-Tests des gemeinsamen Kerns (API, Parsing, Regeln)
+./gradlew lintDebug                # Android Lint
+./gradlew :desktop:run             # Desktop-Client starten
+./gradlew :desktop:packageDeb      # .deb: desktop/build/compose/binaries/main/deb/
 ```
 
 Projektstruktur:
 
 ```
-app/src/main/java/io/github/rsclub22/tireservations/
-├── data/        API-Client, JSON:API-Parsing, Einstellungen, Repository
-└── ui/          Screens: login, list, detail, edit, settings
+shared/    Plattformunabhängiger Kern: TastyIgniter-API-Client, JSON:API-Parsing, Modelle,
+           Repository, Validierung, Formatierung, Update-Prüfung
+app/       Android-App (Jetpack Compose): Screens, DataStore-Einstellungen
+desktop/   Linux-Desktop-Client (Compose Multiplatform), Einstellungen als Datei
 ```
 
 ## CI/CD-Pipeline
 
 `.github/workflows/android.yml`:
 
-- **Jeder Push / Pull Request**: Lint, Unit-Tests, Debug-APK bauen; APK und Berichte werden als
-  Artefakte hochgeladen.
-- **Tag `v*`** (z. B. `v1.0.0`): signiertes Release-APK und -AAB bauen und als GitHub-Release
-  veröffentlichen. `versionName` kommt aus dem Tag, `versionCode` aus der Laufnummer.
+- **Jeder Push / Pull Request**: Lint, Unit-Tests, Debug-APK und Desktop-`.deb` bauen; APK, `.deb`
+  und Berichte werden als Artefakte hochgeladen.
+- **Tag `v*`** (z. B. `v1.0.0`): signiertes Release-APK, -AAB und Desktop-`.deb` bauen und als
+  GitHub-Release veröffentlichen. `versionName` kommt aus dem Tag, `versionCode` aus der Laufnummer.
 
 Dependabot hält Gradle-Abhängigkeiten und Actions aktuell.
 

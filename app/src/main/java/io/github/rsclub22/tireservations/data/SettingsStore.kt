@@ -10,22 +10,9 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-data class AppSettings(
-    val baseUrl: String = "",
-    val email: String = "",
-    val isAdmin: Boolean = true,
-    val token: String? = null,
-    val userName: String? = null,
-    val defaultLocationId: Long? = null,
-    /** Update the user chose "Später" for; not offered again automatically. */
-    val skippedUpdateVersion: String? = null,
-) {
-    val isLoggedIn: Boolean get() = !token.isNullOrBlank() && baseUrl.isNotBlank()
-}
-
 private val Context.dataStore by preferencesDataStore(name = "settings")
 
-class SettingsStore(private val context: Context) {
+class SettingsStore(private val context: Context) : SettingsStorage {
 
     private object Keys {
         val baseUrl = stringPreferencesKey("base_url")
@@ -37,7 +24,7 @@ class SettingsStore(private val context: Context) {
         val skippedUpdate = stringPreferencesKey("skipped_update")
     }
 
-    val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
+    override val settings: Flow<AppSettings> = context.dataStore.data.map { it.toSettings() }
 
     private fun Preferences.toSettings() = AppSettings(
         baseUrl = this[Keys.baseUrl].orEmpty(),
@@ -49,7 +36,7 @@ class SettingsStore(private val context: Context) {
         skippedUpdateVersion = this[Keys.skippedUpdate],
     )
 
-    suspend fun saveLogin(baseUrl: String, email: String, isAdmin: Boolean, token: String, userName: String?) {
+    override suspend fun saveLogin(baseUrl: String, email: String, isAdmin: Boolean, token: String, userName: String?) {
         context.dataStore.edit {
             it[Keys.baseUrl] = baseUrl
             it[Keys.email] = email
@@ -59,17 +46,17 @@ class SettingsStore(private val context: Context) {
         }
     }
 
-    suspend fun setDefaultLocation(id: Long?) {
+    override suspend fun setDefaultLocation(id: Long?) {
         context.dataStore.edit {
             if (id != null) it[Keys.defaultLocation] = id else it.remove(Keys.defaultLocation)
         }
     }
 
-    suspend fun skipUpdate(version: String) {
+    override suspend fun skipUpdate(version: String) {
         context.dataStore.edit { it[Keys.skippedUpdate] = version }
     }
 
-    suspend fun logout() {
+    override suspend fun logout() {
         context.dataStore.edit {
             it.remove(Keys.token)
             it.remove(Keys.userName)

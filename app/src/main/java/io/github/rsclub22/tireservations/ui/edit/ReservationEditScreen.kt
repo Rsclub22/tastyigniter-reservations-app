@@ -64,12 +64,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.rsclub22.tireservations.data.DiningTable
 import io.github.rsclub22.tireservations.data.ReservationRepository
+import io.github.rsclub22.tireservations.data.ReservationRules
 import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.ui.components.ErrorCard
 import io.github.rsclub22.tireservations.ui.components.LoadingBox
-import io.github.rsclub22.tireservations.ui.components.LongDateFormat
-import io.github.rsclub22.tireservations.ui.components.display
-import io.github.rsclub22.tireservations.ui.components.statusLabel
+import io.github.rsclub22.tireservations.format.LongDateFormat
+import io.github.rsclub22.tireservations.format.display
+import io.github.rsclub22.tireservations.format.statusLabel
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -325,15 +326,18 @@ private enum class TimeTarget { START, END }
 /** End of the stay, with the number of days it runs past the start day. */
 private fun endLabel(start: LocalTime, durationMinutes: Int): String {
     val end = start.plusMinutes(durationMinutes.toLong())
-    return end.display() + when (val days = ReservationEditViewModel.daysAfterStart(start, durationMinutes)) {
+    return end.display() + when (val days = ReservationRules.daysAfterStart(start, durationMinutes)) {
         0 -> ""
         1 -> " (+1 Tag)"
         else -> " (+$days Tage)"
     }
 }
 
-private fun fits(t: DiningTable, guests: Int): Boolean =
-    (t.maxCapacity == null || guests <= t.maxCapacity) && (t.minCapacity == null || guests >= t.minCapacity)
+private fun fits(t: DiningTable, guests: Int): Boolean {
+    val max = t.maxCapacity
+    val min = t.minCapacity
+    return (max == null || guests <= max) && (min == null || guests >= min)
+}
 
 private fun tableLabel(t: DiningTable): String {
     val cap = when {

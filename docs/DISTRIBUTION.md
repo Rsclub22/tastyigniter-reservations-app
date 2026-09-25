@@ -98,3 +98,19 @@ Google-Richtlinien ändern sich regelmäßig; maßgeblich ist, was die Play Cons
 Google hat angekündigt, dass auch außerhalb des Play Stores installierte Apps einem verifizierten
 Entwickler zugeordnet sein müssen (schrittweise Einführung nach Ländern ab 2026). Sobald das für
 Deutschland gilt, ist für Weg 1 eine einmalige Registrierung nötig, nicht der Play Store.
+
+---
+
+## Linux-Desktop-Client
+
+Der Desktop-Client wird bei jedem `v*`-Tag als `.deb` (Debian/Ubuntu) mit an das GitHub-Release
+gehängt; bei jedem Push liegt er als CI-Artefakt `desktop-deb` bereit. Installation:
+
+```bash
+sudo apt install ./ti-reservierungen_1.0.0_amd64.deb
+```
+
+Updates: neues `.deb` genauso installieren (ersetzt die alte Version). Eine Update-Prüfung wie in der
+Android-App gibt es auf dem Desktop noch nicht. Ein `.rpm` (Fedora/openSUSE) lässt sich mit
+`./gradlew :desktop:packageRpm` bauen (braucht `rpm-build`), ist aber noch nicht Teil der Pipeline.
+

@@ -1,6 +1,5 @@
 package io.github.rsclub22.tireservations.data
 
-import android.os.Build
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -11,8 +10,10 @@ import okhttp3.OkHttpClient
  * lookup data (locations, tables, statuses) which rarely change.
  */
 class ReservationRepository(
-    private val settingsStore: SettingsStore,
+    private val settingsStore: SettingsStorage,
     private val httpClient: OkHttpClient,
+    /** Shown in TastyIgniter's token list, e.g. "Android Pixel 8" or "Linux Desktop". */
+    private val deviceName: String,
 ) {
     private val mutex = Mutex()
     private var cachedApi: TastyIgniterApi? = null
@@ -35,9 +36,8 @@ class ReservationRepository(
 
     suspend fun login(serverUrl: String, email: String, password: String, isAdmin: Boolean) {
         val baseUrl = TastyIgniterApi.normalizeBaseUrl(serverUrl)
-        val deviceName = "Android ${Build.MANUFACTURER} ${Build.MODEL}".take(255)
         val token = TastyIgniterApi(httpClient, baseUrl, null)
-            .createToken(email.trim(), password, isAdmin, deviceName)
+            .createToken(email.trim(), password, isAdmin, deviceName.take(255))
         val userName = runCatching { TastyIgniterApi(httpClient, baseUrl, token).currentUserName() }.getOrNull()
         settingsStore.saveLogin(baseUrl, email.trim(), isAdmin, token, userName)
         clearCache()

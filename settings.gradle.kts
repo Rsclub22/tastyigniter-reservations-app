@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "TastyIgniterReservations"
-include(":app")
+include(":app", ":shared", ":desktop")

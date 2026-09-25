@@ -70,10 +70,10 @@ import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.ReservationStatus
 import io.github.rsclub22.tireservations.ui.components.ErrorCard
 import io.github.rsclub22.tireservations.ui.components.LoadingBox
-import io.github.rsclub22.tireservations.ui.components.LongDateFormat
+import io.github.rsclub22.tireservations.format.LongDateFormat
 import io.github.rsclub22.tireservations.ui.components.StatusBadge
-import io.github.rsclub22.tireservations.ui.components.display
-import io.github.rsclub22.tireservations.ui.components.statusLabel
+import io.github.rsclub22.tireservations.format.display
+import io.github.rsclub22.tireservations.format.statusLabel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update

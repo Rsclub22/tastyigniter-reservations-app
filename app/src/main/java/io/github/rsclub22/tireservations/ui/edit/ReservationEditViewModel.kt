@@ -8,6 +8,7 @@ import io.github.rsclub22.tireservations.data.DiningTable
 import io.github.rsclub22.tireservations.data.Location
 import io.github.rsclub22.tireservations.data.ReservationDraft
 import io.github.rsclub22.tireservations.data.ReservationRepository
+import io.github.rsclub22.tireservations.data.ReservationRules
 import io.github.rsclub22.tireservations.data.ReservationStatus
 import io.github.rsclub22.tireservations.data.SettingsStore
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,7 +16,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -102,7 +102,7 @@ class ReservationEditViewModel(
     /** Sets the end time; the stay is stored as a duration, so it is converted into minutes. */
     fun setEnd(end: LocalTime?) {
         val draft = _state.value.draft
-        val minutes = end?.let { durationForEnd(draft.time, it, draft.duration) }
+        val minutes = end?.let { ReservationRules.durationForEnd(draft.time, it, draft.duration) }
         _state.update {
             it.copy(durationText = minutes?.toString().orEmpty(), draft = it.draft.copy(duration = minutes))
         }
@@ -114,7 +114,7 @@ class ReservationEditViewModel(
 
     fun save() {
         val s = _state.value
-        val errors = validate(s.draft)
+        val errors = ReservationRules.validate(s.draft)
         if (errors.isNotEmpty()) {
             _state.update { it.copy(fieldErrors = errors, error = "Bitte die markierten Felder prüfen.") }
             return
@@ -138,49 +138,6 @@ class ReservationEditViewModel(
                     )
                 }
             }
-        }
-    }
-
-    companion object {
-        /** Minutes from [start] to [end]; an end at or before the start is taken as the next day. */
-        fun durationBetween(start: LocalTime, end: LocalTime): Int {
-            val minutes = Duration.between(start, end).toMinutes().toInt()
-            return if (minutes <= 0) minutes + MINUTES_PER_DAY else minutes
-        }
-
-        /**
-         * Duration for a newly picked end time. The picker only knows a clock time:
-         * - stays under 24 hours end at the next occurrence of that time after the start;
-         * - longer stays keep the day they currently end on, so only the clock time changes.
-         */
-        fun durationForEnd(start: LocalTime, end: LocalTime, currentDuration: Int?): Int {
-            if (currentDuration == null || currentDuration < MINUTES_PER_DAY) return durationBetween(start, end)
-            val endDay = daysAfterStart(start, currentDuration)
-            val minutes = endDay * MINUTES_PER_DAY + (end.toSecondOfDay() - start.toSecondOfDay()) / 60
-            return if (minutes <= 0) minutes + MINUTES_PER_DAY else minutes
-        }
-
-        /** Number of days the stay ends after the start day (0 = same day). */
-        fun daysAfterStart(start: LocalTime, durationMinutes: Int): Int =
-            (start.toSecondOfDay() / 60 + durationMinutes) / MINUTES_PER_DAY
-
-        private const val MINUTES_PER_DAY = 24 * 60
-
-        private val EMAIL = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
-
-        /** Mirrors the validation rules of the TastyIgniter API (`ReservationRequest`). */
-        fun validate(d: ReservationDraft): Map<String, String> = buildMap {
-            if (d.locationId == null) put("location_id", "Bitte einen Standort wählen.")
-            if (d.guestNum < 1) put("guest_num", "Mindestens 1 Gast.")
-            if (d.firstName.isBlank()) put("first_name", "Vorname fehlt.")
-            if (d.firstName.trim().length > 48) put("first_name", "Maximal 48 Zeichen.")
-            if (d.lastName.isBlank()) put("last_name", "Nachname fehlt.")
-            if (d.lastName.trim().length > 48) put("last_name", "Maximal 48 Zeichen.")
-            // E-mail is optional (not every installation requires it), but must be valid if given.
-            if (d.email.isNotBlank() && !EMAIL.matches(d.email.trim())) put("email", "Keine gültige E-Mail-Adresse.")
-            if (d.email.trim().length > 96) put("email", "Maximal 96 Zeichen.")
-            if (d.telephone.isBlank()) put("telephone", "Telefonnummer fehlt.")
-            if (d.comment.length > 520) put("comment", "Maximal 520 Zeichen.")
         }
     }
 }
