@@ -119,6 +119,10 @@ compose.desktop {
                 // TLS mit EC-Zertifikaten. Fehlt es, schlaegt jede HTTPS-Anfrage an
                 // den Server fehl - und zwar erst zur Laufzeit.
                 "jdk.crypto.ec",
+                // Ohne die Sprachdaten kennt das minimierte JRE nur die
+                // Wurzel-Locale: aus "So" wird "SUN" und aus "Sonntag" "Sunday",
+                // obwohl im Code ueberall Locale.GERMAN steht.
+                "jdk.localedata",
                 "java.instrument",
                 "java.naming",
                 "java.sql",

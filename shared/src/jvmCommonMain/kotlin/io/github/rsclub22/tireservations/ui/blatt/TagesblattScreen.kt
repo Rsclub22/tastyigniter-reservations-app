@@ -17,6 +17,11 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material3.Card
+import java.time.LocalTime
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -77,10 +82,36 @@ fun TagesblattScreen(
     val snackbar = remember { SnackbarHostState() }
     var waehleVon by remember { mutableStateOf(false) }
     var waehleBis by remember { mutableStateOf(false) }
+    var waehleTrennzeit by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.unauthorized) { if (state.unauthorized) onUnauthorized() }
     LaunchedEffect(state.meldung) {
         state.meldung?.let { snackbar.showSnackbar(it); vm.meldungGesehen() }
+    }
+
+    if (waehleTrennzeit) {
+        val vorgabe = (state.trennung as? Trennung.Um)?.zeit
+            ?: state.blatt?.trennzeit
+            ?: LocalTime.of(15, 0)
+        val zustand = rememberTimePickerState(
+            initialHour = vorgabe.hour,
+            initialMinute = vorgabe.minute,
+            is24Hour = true,
+        )
+        AlertDialog(
+            onDismissRequest = { waehleTrennzeit = false },
+            title = { Text("Ab wann das zweite Blatt?") },
+            text = { TimePicker(state = zustand) },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.setTrennung(Trennung.Um(LocalTime.of(zustand.hour, zustand.minute)))
+                    waehleTrennzeit = false
+                }) { Text("Übernehmen") }
+            },
+            dismissButton = {
+                TextButton(onClick = { waehleTrennzeit = false }) { Text("Abbrechen") }
+            },
+        )
     }
 
     if (waehleVon) {
@@ -129,14 +160,27 @@ fun TagesblattScreen(
                 onBis = { waehleBis = true },
             )
 
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Trennung.entries.forEach { trennung ->
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf(Trennung.Vorgabe, Trennung.Keine).forEach { trennung ->
                     FilterChip(
                         selected = state.trennung == trennung,
                         onClick = { vm.setTrennung(trennung) },
                         label = { Text(trennung.beschriftung) },
                     )
                 }
+                // Dritte Moeglichkeit: eine Zeit von Hand. An Tagen mit anderem
+                // Ablauf - zwei Gaenge an Weihnachten etwa - liegt die Trennung
+                // woanders als die 15 Uhr des Wochenbetriebs.
+                val eigene = state.trennung as? Trennung.Um
+                FilterChip(
+                    selected = eigene != null,
+                    onClick = { waehleTrennzeit = true },
+                    label = { Text(eigene?.beschriftung ?: "Uhrzeit wählen …") },
+                    leadingIcon = { Icon(Icons.Outlined.Schedule, contentDescription = null) },
+                )
             }
 
             state.fehler?.let { ErrorCard(it, onRetry = vm::neuLaden) }

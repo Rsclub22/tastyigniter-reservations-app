@@ -14,21 +14,43 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-/** Wie der Tag auf die Blaetter verteilt wird. */
-enum class Trennung(val wert: String?, val beschriftung: String) {
-    /** Die im Haus eingestellte Zeit, meist 15:00. */
-    VORGABE(null, "Mittag / Abend"),
+/**
+ * Wie der Tag auf die Blaetter verteilt wird.
+ *
+ * [wert] ist, was der Server erwartet: nichts fuer seine eigene Vorgabe, "aus"
+ * fuer ein einziges Blatt, sonst HH:MM.
+ */
+sealed interface Trennung {
+
+    val wert: String?
+    val beschriftung: String
+
+    /** Die im Haus eingestellte Zeit - INTERN_DRUCK_TRENNZEIT, meist 15:00. */
+    data object Vorgabe : Trennung {
+        override val wert: String? = null
+        override val beschriftung = "Mittag / Abend"
+    }
 
     /** Ein einziges Blatt fuer den ganzen Tag. */
-    KEINE("aus", "Ganzer Tag"),
+    data object Keine : Trennung {
+        override val wert = "aus"
+        override val beschriftung = "Ganzer Tag"
+    }
+
+    /** Eine von Hand gewaehlte Zeit, etwa fuer einen Tag mit anderem Ablauf. */
+    data class Um(val zeit: LocalTime) : Trennung {
+        override val wert: String = zeit.format(DateTimeFormatter.ofPattern("HH:mm"))
+        override val beschriftung get() = "ab $wert Uhr"
+    }
 }
 
 data class BlattState(
     val von: LocalDate = LocalDate.now(),
     val bis: LocalDate = LocalDate.now(),
-    val trennung: Trennung = Trennung.VORGABE,
+    val trennung: Trennung = Trennung.Vorgabe,
     val blatt: Tagesblatt? = null,
     val laden: Boolean = true,
     val fehler: String? = null,
