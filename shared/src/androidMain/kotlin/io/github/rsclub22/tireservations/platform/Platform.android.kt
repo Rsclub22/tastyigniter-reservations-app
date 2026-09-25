@@ -16,6 +16,8 @@ import android.print.PrintManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.app.NotificationCompat
+import io.github.rsclub22.tireservations.data.Druckblatt
+import io.github.rsclub22.tireservations.data.Tagesblatt
 import androidx.core.app.NotificationManagerCompat
 import java.io.File
 import java.lang.ref.WeakReference
@@ -101,8 +103,9 @@ private fun start(intent: Intent): Boolean = try {
  * Laeuft auf dem Hauptfaden - WebView laesst sich nirgendwo sonst erzeugen - und
  * braucht eine Activity, siehe [setzeAktiveActivity].
  */
-actual fun drucke(html: String, titel: String): Boolean {
+actual fun drucke(blatt: Tagesblatt, standort: String, gedrucktAm: String, titel: String): Boolean {
     val activity = aktiveActivity?.get() ?: return false
+    val html = Druckblatt.html(blatt, standort, gedrucktAm)
 
     Handler(Looper.getMainLooper()).post {
         val web = WebView(activity)

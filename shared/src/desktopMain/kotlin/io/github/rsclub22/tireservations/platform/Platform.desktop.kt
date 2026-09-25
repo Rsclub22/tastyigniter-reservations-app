@@ -1,6 +1,9 @@
 package io.github.rsclub22.tireservations.platform
 
+import io.github.rsclub22.tireservations.data.Tagesblatt
 import java.awt.Desktop
+import java.awt.print.PageFormat
+import java.awt.print.PrinterJob
 import java.io.File
 import java.net.URI
 import java.net.URLEncoder
@@ -69,20 +72,30 @@ private fun encode(text: String): String =
     URLEncoder.encode(text, "UTF-8").replace("+", "%20")
 
 /**
- * Schreibt das Blatt in eine Datei und oeffnet sie im Browser - von dort geht es
- * mit Strg+P auf den Drucker.
+ * Zeichnet das Blatt selbst und zeigt den Druckdialog des Systems.
  *
- * Bewusst nicht Desktop.print(): das schickt die Datei ohne Vorschau und ohne
- * Auswahl des Druckers direkt an den Standarddrucker. Beim Tagesblatt will man
- * vorher sehen, was kommt, und oft nur einen der Abschnitte.
+ * Kein Browser und kein Desktop.print(): Letzteres schickt eine Datei ohne Vorschau
+ * und ohne Druckerauswahl an den Standarddrucker, Ersteres holt fuer einen Druck ein
+ * ganzes Programm dazu. PrinterJob.printDialog() gibt dagegen genau das, was man am
+ * Telefon braucht - Drucker waehlen, Seiten waehlen, drucken.
+ *
+ * Ein Abbruch im Dialog meldet true: nicht drucken zu wollen ist kein Fehler, und
+ * eine Fehlermeldung dafuer waere nur laestig.
  */
-actual fun drucke(html: String, titel: String): Boolean = runCatching {
-    val name = titel.replace(Regex("[^A-Za-z0-9_-]"), "-").take(40).ifBlank { "tagesblatt" }
-    val datei = File.createTempFile("$name-", ".html")
-    datei.deleteOnExit()
-    datei.writeText(html, Charsets.UTF_8)
+actual fun drucke(blatt: Tagesblatt, standort: String, gedrucktAm: String, titel: String): Boolean = runCatching {
+    val job = PrinterJob.getPrinterJob()
+    job.setJobName(titel)
 
-    browse(datei.toURI())
+    val druck = Tagesblattdruck(blatt, standort, gedrucktAm)
+    // Querformat: sieben Spalten mit Name, Tischen und Telefonnummer werden auf
+    // Hochkant zu eng, und das Blatt wird sowieso quer abgelegt.
+    val format = job.defaultPage().apply { orientation = PageFormat.LANDSCAPE }
+    job.setPrintable(druck, format)
+
+    if (!job.printDialog()) return true
+
+    job.print()
+    true
 }.getOrDefault(false)
 
 /**

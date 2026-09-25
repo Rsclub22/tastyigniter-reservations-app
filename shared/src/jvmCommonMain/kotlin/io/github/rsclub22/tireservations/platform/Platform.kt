@@ -1,5 +1,7 @@
 package io.github.rsclub22.tireservations.platform
 
+import io.github.rsclub22.tireservations.data.Tagesblatt
+
 /**
  * Das Wenige, was Android und Desktop unterschiedlich machen müssen.
  *
@@ -30,13 +32,17 @@ expect fun composeMail(address: String, subject: String): Boolean
 expect fun openUrl(url: String): Boolean
 
 /**
- * Gibt ein druckfertiges HTML aus - auf dem Desktop im Browser, am Telefon ueber
- * die Druckfunktion des Systems. In beiden Faellen bekommt man eine Vorschau,
- * bevor Papier verbraucht wird.
+ * Druckt das Tagesblatt.
  *
- * @return false, wenn dafuer nichts eingerichtet ist.
+ * Uebergeben werden die Daten und nicht fertiges HTML, weil beide Plattformen
+ * verschieden drucken: Android macht ueber WebView und PrintManager aus dem HTML
+ * ein Dokument, der Desktop zeichnet das Blatt selbst mit Java2D und zeigt den
+ * Druckdialog des Systems. Ein Browser oeffnet sich dabei nicht.
+ *
+ * @return false, wenn kein Druckweg eingerichtet ist. Ein Abbruch im Dialog ist
+ *   kein Fehler und meldet true.
  */
-expect fun drucke(html: String, titel: String): Boolean
+expect fun drucke(blatt: Tagesblatt, standort: String, gedrucktAm: String, titel: String): Boolean
 
 /**
  * Meldet sich beim Betriebssystem - Benachrichtigungsleiste am Telefon,

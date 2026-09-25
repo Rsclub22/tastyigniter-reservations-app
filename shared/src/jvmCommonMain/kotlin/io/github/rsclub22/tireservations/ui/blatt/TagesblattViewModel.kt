@@ -3,7 +3,6 @@ package io.github.rsclub22.tireservations.ui.blatt
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.rsclub22.tireservations.data.ApiException
-import io.github.rsclub22.tireservations.data.Druckblatt
 import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.Tagesblatt
 import io.github.rsclub22.tireservations.platform.drucke
@@ -63,9 +62,9 @@ data class BlattState(
 /**
  * Das Tagesblatt: was am Abend auf Papier neben dem Telefon liegt.
  *
- * Gedruckt wird ueber ein erzeugtes HTML, nicht ueber Zeichenbefehle - siehe
- * [Druckblatt]. Der Weg auf den Drucker ist das Einzige, was sich je Plattform
- * unterscheidet.
+ * Der Weg auf den Drucker ist das Einzige, was sich je Plattform unterscheidet:
+ * Android macht aus den Daten HTML und laesst den Systemdienst setzen, der Desktop
+ * zeichnet das Blatt selbst. Das ViewModel uebergibt darum die Daten, nicht Papier.
  */
 class TagesblattViewModel(
     private val repository: ReservationRepository,
@@ -133,7 +132,9 @@ class TagesblattViewModel(
             val gedruckt = LocalDate.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
 
             val erfolg = drucke(
-                html = Druckblatt.html(blatt, standort, gedruckt),
+                blatt = blatt,
+                standort = standort,
+                gedrucktAm = gedruckt,
                 titel = "Tagesblatt ${blatt.von}",
             )
 
@@ -142,7 +143,7 @@ class TagesblattViewModel(
                     meldung = if (erfolg) {
                         null
                     } else {
-                        "Zum Drucken wird ein Browser bzw. ein Druckdienst gebraucht – hier ist keiner eingerichtet."
+                        "Auf diesem Gerät ist kein Druckweg eingerichtet."
                     },
                 )
             }
