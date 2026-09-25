@@ -36,6 +36,26 @@ class ReservationValidationTest {
     }
 
     @Test
+    fun `picking an end keeps whole extra days of long stays`() {
+        val start = LocalTime.of(19, 0)
+        assertEquals(150, ReservationEditViewModel.durationForEnd(start, LocalTime.of(21, 30), null))
+        assertEquals(150, ReservationEditViewModel.durationForEnd(start, LocalTime.of(21, 30), 90))
+        // Exactly 24 h stays 24 h when the same clock time is confirmed again.
+        assertEquals(1440, ReservationEditViewModel.durationForEnd(start, start, 1440))
+        // 48 h must not shrink to 24 h just because the picker shows 19:00.
+        assertEquals(2880, ReservationEditViewModel.durationForEnd(start, start, 2880))
+        assertEquals(1470 + 1440, ReservationEditViewModel.durationForEnd(start, LocalTime.of(19, 30), 2900))
+    }
+
+    @Test
+    fun `days after start for end label`() {
+        val start = LocalTime.of(19, 0)
+        assertEquals(0, ReservationEditViewModel.daysAfterStart(start, 120))
+        assertEquals(1, ReservationEditViewModel.daysAfterStart(start, 300))
+        assertEquals(2, ReservationEditViewModel.daysAfterStart(start, 2880))
+    }
+
+    @Test
     fun `email is optional`() {
         assertTrue(ReservationEditViewModel.validate(valid.copy(email = "")).isEmpty())
     }

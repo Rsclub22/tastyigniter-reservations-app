@@ -101,7 +101,8 @@ class ReservationEditViewModel(
 
     /** Sets the end time; the stay is stored as a duration, so it is converted into minutes. */
     fun setEnd(end: LocalTime?) {
-        val minutes = end?.let { durationBetween(_state.value.draft.time, it) }
+        val draft = _state.value.draft
+        val minutes = end?.let { durationForEnd(draft.time, it, draft.duration) }
         _state.update {
             it.copy(durationText = minutes?.toString().orEmpty(), draft = it.draft.copy(duration = minutes))
         }
@@ -144,8 +145,23 @@ class ReservationEditViewModel(
         /** Minutes from [start] to [end]; an end at or before the start is taken as the next day. */
         fun durationBetween(start: LocalTime, end: LocalTime): Int {
             val minutes = Duration.between(start, end).toMinutes().toInt()
-            return if (minutes <= 0) minutes + 24 * 60 else minutes
+            return if (minutes <= 0) minutes + MINUTES_PER_DAY else minutes
         }
+
+        /**
+         * Duration for a newly picked end time. The picker only knows a clock time, so whole
+         * extra days of a stay longer than 24 hours are kept from [currentDuration].
+         */
+        fun durationForEnd(start: LocalTime, end: LocalTime, currentDuration: Int?): Int {
+            val extraDays = ((currentDuration ?: 1) - 1).coerceAtLeast(0) / MINUTES_PER_DAY
+            return durationBetween(start, end) + extraDays * MINUTES_PER_DAY
+        }
+
+        /** Number of days the stay ends after the start day (0 = same day). */
+        fun daysAfterStart(start: LocalTime, durationMinutes: Int): Int =
+            (start.toSecondOfDay() / 60 + durationMinutes) / MINUTES_PER_DAY
+
+        private const val MINUTES_PER_DAY = 24 * 60
 
         private val EMAIL = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 

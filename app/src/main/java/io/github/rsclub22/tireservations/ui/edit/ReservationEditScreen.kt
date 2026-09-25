@@ -322,11 +322,14 @@ fun ReservationEditScreen(
 
 private enum class TimeTarget { START, END }
 
-/** End of the stay, marked when it runs past midnight. */
+/** End of the stay, with the number of days it runs past the start day. */
 private fun endLabel(start: LocalTime, durationMinutes: Int): String {
     val end = start.plusMinutes(durationMinutes.toLong())
-    val nextDay = start.toSecondOfDay() + durationMinutes * 60L >= 24 * 60 * 60
-    return end.display() + if (nextDay) " (+1 Tag)" else ""
+    return end.display() + when (val days = ReservationEditViewModel.daysAfterStart(start, durationMinutes)) {
+        0 -> ""
+        1 -> " (+1 Tag)"
+        else -> " (+$days Tage)"
+    }
 }
 
 private fun fits(t: DiningTable, guests: Int): Boolean =
