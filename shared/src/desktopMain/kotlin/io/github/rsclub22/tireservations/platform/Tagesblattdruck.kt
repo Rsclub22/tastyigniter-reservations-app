@@ -27,6 +27,9 @@ import java.util.Locale
  * HTML fuer Android: Da, Zeit, Name, Pers., Tisch/Raum, Telefon, Nr. Wer das Blatt
  * seit Jahren in der Hand hat, soll nicht umlernen muessen - Hochformat deshalb
  * ebenso, auch wenn sieben Spalten darauf eng stehen.
+ *
+ * Gesetzt wird kraeftig: das Blatt liegt neben dem Telefon und wird im Vorbeigehen
+ * gelesen, nicht am Schreibtisch studiert.
  */
 internal class Tagesblattdruck(
     private val blatt: Tagesblatt,
@@ -64,7 +67,7 @@ internal class Tagesblattdruck(
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
         g2.translate(pf.imageableX, pf.imageableY)
 
-        zeichne(g2, alle[seitenIndex], pf.imageableWidth.toFloat())
+        zeichne(g2, alle[seitenIndex], pf.imageableWidth.toFloat(), pf.imageableHeight.toFloat())
 
         return Printable.PAGE_EXISTS
     }
@@ -89,19 +92,31 @@ internal class Tagesblattdruck(
 
         abschnitte.forEachIndexed { i, (tag, abschnitt) ->
             val hinweise = hinweise(tag)
-            val hinweisHoehe = hinweise.sumOf { (umbrechen(it, breite - 2 * RAND).size * ZEILE + 10).toInt() }
-
-            val platzErsteSeite = hoehe - KOPF - hinweisHoehe - TABELLENKOPF
-            val platzWeitere = hoehe - KOPF - TABELLENKOPF
-
-            val ersteSeite = maxOf(1, (platzErsteSeite / ZEILE).toInt())
-            val weitere = maxOf(1, (platzWeitere / ZEILE).toInt())
+            val hinweisHoehe = hinweise.fold(0f) { summe, hinweis ->
+                summe + umbrechen(hinweis, breite - 2 * RAND, ZEICHENBREITE).size * ZEILE + 10f
+            }
 
             var rest = abschnitt.reservierungen
             var teil = 0
 
             do {
-                val nimm = if (teil == 0) ersteSeite else weitere
+                // Zeilen sind verschieden hoch: unter dem Namen kann eine Notiz
+                // haengen. Deshalb wird gefuellt und nicht geteilt.
+                val platz = hoehe - KOPF - TABELLENKOPF - FUSS -
+                    (if (teil == 0) hinweisHoehe else 0f)
+
+                val genommen = mutableListOf<InternReservierung>()
+                var verbraucht = 0f
+
+                for (r in rest) {
+                    val h = zeilenhoehe(r, breite)
+                    // Mindestens eine Zeile je Seite, sonst laeuft das Fuellen leer,
+                    // wenn eine einzelne Notiz laenger ist als eine ganze Seite.
+                    if (verbraucht + h > platz && genommen.isNotEmpty()) break
+                    genommen += r
+                    verbraucht += h
+                }
+
                 ergebnis += Seite(
                     tag = tag,
                     abschnitt = abschnitt,
@@ -109,9 +124,10 @@ internal class Tagesblattdruck(
                     blattGesamt = abschnitte.size,
                     fortsetzung = teil,
                     hinweise = if (teil == 0) hinweise else emptyList(),
-                    zeilen = rest.take(nimm),
+                    zeilen = genommen,
                 )
-                rest = rest.drop(nimm)
+
+                rest = rest.drop(genommen.size)
                 teil++
             } while (rest.isNotEmpty())
         }
@@ -125,6 +141,21 @@ internal class Tagesblattdruck(
         a.imageableWidth == b.imageableWidth &&
             a.imageableHeight == b.imageableHeight &&
             a.orientation == b.orientation
+
+    private fun zeilenhoehe(r: InternReservierung, breite: Float): Float =
+        ZEILE + notizzeilen(r, breite).size * NOTIZ_ZEILE
+
+    /**
+     * Die Notiz einer Reservierung, umbrochen. Sie steht unter dem Namen und laeuft
+     * bis zur Nummernspalte - das ist eine eigene Zeile, dort steht sonst nichts.
+     */
+    private fun notizzeilen(r: InternReservierung, breite: Float): List<String> {
+        if (r.kommentar.isBlank()) return emptyList()
+
+        val bis = SPALTENBREITEN.drop(2).dropLast(1).sum() * breite
+
+        return umbrechen(r.kommentar, bis, ZEICHENBREITE_KLEIN)
+    }
 
     private fun hinweise(tag: BlattTag): List<String> = buildList {
         if (tag.gesperrt) {
@@ -143,51 +174,51 @@ internal class Tagesblattdruck(
 
     // --- Zeichnen ---------------------------------------------------------------------
 
-    private fun zeichne(g: Graphics2D, seite: Seite, breite: Float) {
+    private fun zeichne(g: Graphics2D, seite: Seite, breite: Float, hoehe: Float) {
         var y = 0f
 
         // Kopf: links der Tag, rechts Abschnitt, Zahlen und Blattnummer.
         g.color = SCHWARZ
         g.font = FONT_TAG
-        g.drawString(seite.tag.datum.format(TAG_LANG), 0f, y + 14f)
+        g.drawString(seite.tag.datum.format(TAG_LANG), 0f, y + 16f)
         g.font = FONT_KLEIN
         g.color = GRAU
-        g.drawString(standort, 0f, y + 28f)
+        g.drawString(standort, 0f, y + 31f)
 
         g.color = SCHWARZ
         g.font = FONT_FETT
-        rechts(g, seite.abschnitt.titel, breite, y + 12f)
+        rechts(g, seite.abschnitt.titel, breite, y + 14f)
         g.font = FONT_KLEIN
         g.color = GRAU
         rechts(
             g,
             "${seite.abschnitt.reservierungen.size} Reservierungen · ${seite.abschnitt.gaeste} Gäste",
-            breite, y + 25f,
+            breite, y + 28f,
         )
         val blattText = "Blatt ${seite.blattNr} von ${seite.blattGesamt}" +
             if (seite.fortsetzung > 0) " · Seite ${seite.fortsetzung + 1}" else ""
-        rechts(g, blattText, breite, y + 37f)
+        rechts(g, blattText, breite, y + 41f)
 
         y += KOPF - 8f
         g.color = BRAUN
-        g.stroke = BasicStroke(1.5f)
+        g.stroke = BasicStroke(2f)
         g.drawLine(0, y.toInt(), breite.toInt(), y.toInt())
-        y += 12f
+        y += 13f
 
         // Hinweise
         g.font = FONT_NORMAL
         seite.hinweise.forEach { hinweis ->
-            val zeilen = umbrechen(hinweis, breite - 2 * RAND)
+            val zeilen = umbrechen(hinweis, breite - 2 * RAND, ZEICHENBREITE)
             val kastenHoehe = zeilen.size * ZEILE + 8f
 
             g.color = SAND
             g.fillRect(0, y.toInt(), breite.toInt(), kastenHoehe.toInt())
             g.color = GOLD
-            g.fillRect(0, y.toInt(), 3, kastenHoehe.toInt())
+            g.fillRect(0, y.toInt(), 4, kastenHoehe.toInt())
 
             g.color = SCHWARZ
             zeilen.forEachIndexed { i, text ->
-                g.drawString(text, RAND, y + 11f + i * ZEILE)
+                g.drawString(text, RAND, y + 13f + i * ZEILE)
             }
             y += kastenHoehe + 6f
         }
@@ -195,8 +226,8 @@ internal class Tagesblattdruck(
         if (seite.zeilen.isEmpty()) {
             g.color = GRAU
             g.font = FONT_NORMAL
-            g.drawString("Keine Reservierungen.", 0f, y + 12f)
-            fuss(g, breite)
+            g.drawString("Keine Reservierungen.", 0f, y + 13f)
+            fuss(g, hoehe)
             return
         }
 
@@ -205,12 +236,12 @@ internal class Tagesblattdruck(
         g.font = FONT_KLEIN
         g.color = GRAU
         UEBERSCHRIFTEN.forEachIndexed { i, text ->
-            if (i == 3) rechts(g, text, spalten[i] + SPALTENBREITEN[i] * breite - ABSTAND, y + 9f)
-            else g.drawString(text, spalten[i], y + 9f)
+            if (i == 3) rechts(g, text, spalten[i] + SPALTENBREITEN[i] * breite - ABSTAND, y + 10f)
+            else g.drawString(text, spalten[i], y + 10f)
         }
-        y += 13f
+        y += 15f
         g.color = LINIE
-        g.stroke = BasicStroke(0.6f)
+        g.stroke = BasicStroke(0.8f)
         g.drawLine(0, y.toInt(), breite.toInt(), y.toInt())
 
         // Zeilen
@@ -219,15 +250,18 @@ internal class Tagesblattdruck(
 
             // Kaestchen zum Abhaken, wenn die Gesellschaft da ist.
             g.color = GRAU
-            g.stroke = BasicStroke(0.6f)
-            g.drawRect(spalten[0].toInt(), (y - 9f).toInt(), 9, 9)
+            g.stroke = BasicStroke(0.8f)
+            g.drawRect(spalten[0].toInt(), (y - 10f).toInt(), 11, 11)
 
             g.color = SCHWARZ
             g.font = FONT_FETT
             g.drawString(r.zeit?.format(ZEIT) ?: "—", spalten[1], y)
 
-            g.font = FONT_NORMAL
+            // Der Name ist das, wonach beim Durchgehen gesucht wird.
+            g.font = FONT_NAME
             g.drawString(kuerzen(g, r.name.ifBlank { "—" }, SPALTENBREITEN[2] * breite - 6f), spalten[2], y)
+
+            g.font = FONT_NORMAL
             rechts(g, r.gaeste.toString(), spalten[3] + SPALTENBREITEN[3] * breite - ABSTAND, y)
             g.drawString(kuerzen(g, r.tischeText, SPALTENBREITEN[4] * breite - 6f), spalten[4], y)
             g.drawString(kuerzen(g, r.telefon, SPALTENBREITEN[5] * breite - 6f), spalten[5], y)
@@ -236,19 +270,28 @@ internal class Tagesblattdruck(
             g.font = FONT_KLEIN
             rechts(g, r.id.toString(), breite, y)
 
+            // Die Notiz unter dem Namen. Dort steht, was am Telefon vereinbart
+            // wurde - Kinderstuhl, Kuchen um drei, kommt spaeter. Ohne sie ist
+            // das Blatt nur die halbe Auskunft.
+            val notiz = notizzeilen(r, breite)
+            notiz.forEachIndexed { i, text ->
+                g.drawString(text, spalten[2], y + (i + 1) * NOTIZ_ZEILE)
+            }
+            y += notiz.size * NOTIZ_ZEILE
+
             g.color = LINIE
-            g.drawLine(0, (y + 4f).toInt(), breite.toInt(), (y + 4f).toInt())
+            g.drawLine(0, (y + 5f).toInt(), breite.toInt(), (y + 5f).toInt())
         }
 
-        fuss(g, breite)
+        fuss(g, hoehe)
     }
 
-    private fun fuss(g: Graphics2D, breite: Float) {
+    private fun fuss(g: Graphics2D, hoehe: Float) {
         g.font = FONT_KLEIN
         g.color = GRAU
         val text = "Gedruckt $gedrucktAm" +
             (blatt.trennzeit?.let { " · Trennung ${it.format(ZEIT)} Uhr" } ?: "")
-        g.drawString(text, 0f, (format?.imageableHeight?.toFloat() ?: 700f) - 4f)
+        g.drawString(text, 0f, hoehe - 4f)
     }
 
     /** Linke Kanten der Spalten, aus den Anteilen der Seitenbreite. */
@@ -279,10 +322,11 @@ internal class Tagesblattdruck(
     /**
      * Umbruch an Wortgrenzen. Ohne FontMetrics gerechnet, weil die Aufteilung
      * feststehen muss, bevor die erste Seite gezeichnet wird - daher die grobe
-     * Schaetzung ueber die mittlere Zeichenbreite.
+     * Schaetzung ueber die mittlere Zeichenbreite. Gezeichnet wird spaeter mit
+     * demselben Aufruf, dann stimmen Rechnung und Papier ueberein.
      */
-    private fun umbrechen(text: String, breite: Float): List<String> {
-        val proZeile = maxOf(20, (breite / ZEICHENBREITE).toInt())
+    private fun umbrechen(text: String, breite: Float, zeichenbreite: Float): List<String> {
+        val proZeile = maxOf(20, (breite / zeichenbreite).toInt())
         val zeilen = mutableListOf<String>()
         var aktuell = StringBuilder()
 
@@ -306,11 +350,14 @@ internal class Tagesblattdruck(
         val ZEIT: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
         // Java2D rechnet in Punkten: 72 pro Zoll.
-        const val ZEILE = 15f
-        const val KOPF = 52f
-        const val TABELLENKOPF = 16f
-        const val RAND = 6f
-        const val ZEICHENBREITE = 5.2f
+        const val ZEILE = 18f
+        const val NOTIZ_ZEILE = 13f
+        const val KOPF = 56f
+        const val TABELLENKOPF = 18f
+        const val FUSS = 16f
+        const val RAND = 7f
+        const val ZEICHENBREITE = 6.3f
+        const val ZEICHENBREITE_KLEIN = 4.9f
 
         /** Luft zwischen zwei Spalten, damit "4" und "Tisch 2" nicht aneinanderkleben. */
         const val ABSTAND = 8f
@@ -319,15 +366,16 @@ internal class Tagesblattdruck(
         val SPALTENBREITEN = floatArrayOf(0.045f, 0.085f, 0.33f, 0.065f, 0.19f, 0.20f, 0.085f)
 
         val SCHWARZ = Color(0x2A, 0x1C, 0x16)
-        val GRAU = Color(0x7A, 0x6A, 0x62)
+        val GRAU = Color(0x6B, 0x5B, 0x53)
         val LINIE = Color(0xE4, 0xDA, 0xD3)
         val BRAUN = Color(0x60, 0x21, 0x0F)
         val GOLD = Color(0xB8, 0x86, 0x0B)
         val SAND = Color(0xFA, 0xF5, 0xEC)
 
-        val FONT_TAG = Font(Font.SANS_SERIF, Font.BOLD, 14)
-        val FONT_FETT = Font(Font.SANS_SERIF, Font.BOLD, 10)
-        val FONT_NORMAL = Font(Font.SANS_SERIF, Font.PLAIN, 10)
-        val FONT_KLEIN = Font(Font.SANS_SERIF, Font.PLAIN, 8)
+        val FONT_TAG = Font(Font.SANS_SERIF, Font.BOLD, 16)
+        val FONT_FETT = Font(Font.SANS_SERIF, Font.BOLD, 12)
+        val FONT_NAME = Font(Font.SANS_SERIF, Font.BOLD, 12)
+        val FONT_NORMAL = Font(Font.SANS_SERIF, Font.PLAIN, 12)
+        val FONT_KLEIN = Font(Font.SANS_SERIF, Font.PLAIN, 9)
     }
 }

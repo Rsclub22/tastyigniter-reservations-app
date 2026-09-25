@@ -40,7 +40,11 @@ class TagesblattdruckTest {
         istVermerk = false,
     )
 
-    private fun blatt(anzahl: Int, vermerke: List<Sperrvermerk> = emptyList()) = Tagesblatt(
+    private fun blatt(
+        anzahl: Int,
+        vermerke: List<Sperrvermerk> = emptyList(),
+        notiz: String = "",
+    ) = Tagesblatt(
         von = LocalDate.of(2026, 12, 24),
         bis = LocalDate.of(2026, 12, 24),
         zeitraum = false,
@@ -54,7 +58,11 @@ class TagesblattdruckTest {
                 paxJeZeit = mapOf("11:00" to 35),
                 sperrvermerke = vermerke,
                 blaetter = listOf(
-                    Blatt("Mittag", anzahl * 4, (1..anzahl).map(::reservierung)),
+                    Blatt(
+                        "Mittag",
+                        anzahl * 4,
+                        (1..anzahl).map { reservierung(it).copy(kommentar = notiz) },
+                    ),
                 ),
             ),
         ),
@@ -95,6 +103,24 @@ class TagesblattdruckTest {
         val seiten = druck.seitenzahl(format)
         assertTrue("90 Reservierungen brauchen mehr als eine Seite, waren $seiten", seiten > 1)
         assertEquals(seiten, zeichneAlle(druck, format))
+    }
+
+    @Test
+    fun `Notizen brauchen Platz und verschieben den Umbruch`() {
+        val format = a4Hoch()
+        val lang = "Rollstuhl, bitte Tisch am Fenster – kommt mit dem Bus und ist " +
+            "deshalb vielleicht zehn Minuten später da, bitte den Tisch so lange halten"
+
+        val ohne = Tagesblattdruck(blatt(30), "Gasthaus", "24.12.2026")
+        val mit = Tagesblattdruck(blatt(30, notiz = lang), "Gasthaus", "24.12.2026")
+
+        assertEquals(1, ohne.seitenzahl(format))
+        assertTrue(
+            "Mit Notizen passen nicht mehr alle 30 auf ein Blatt",
+            mit.seitenzahl(format) > ohne.seitenzahl(format),
+        )
+        // Gezeichnet werden muss es trotzdem ohne Ausnahme.
+        assertEquals(mit.seitenzahl(format), zeichneAlle(mit, format))
     }
 
     @Test
