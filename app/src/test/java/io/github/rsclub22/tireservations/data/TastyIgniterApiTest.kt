@@ -5,8 +5,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import okhttp3.OkHttpClient
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -78,15 +80,55 @@ class TastyIgniterApiTest {
         assertEquals("2", server.takeRequest().requestUrl!!.queryParameter("page"))
     }
 
+    private fun reservationJson(id: Int, date: String, time: String = "19:00:00") =
+        """{"type":"reservations","id":"$id","attributes":{"reservation_id":$id,"guest_num":2,""" +
+            """"first_name":"G$id","last_name":"X","reserve_date":"$date","reserve_time":"$time"}}"""
+
+    private fun page(current: Int, total: Int, vararg items: String) =
+        """{"data":[${items.joinToString(",")}],"meta":{"pagination":{"current_page":$current,"total_pages":$total}}}"""
+
     @Test
-    fun `sends date range filter`() = runTest {
-        server.enqueue(MockResponse().setBody("""{"data":[]}"""))
+    fun `day view pages newest first and filters on the client`() = runTest {
+        val pages = mapOf(
+            1 to page(1, 4, reservationJson(1, "2026-09-27"), reservationJson(2, "2026-09-25", "20:00:00"), reservationJson(3, "2026-09-25", "18:00:00")),
+            2 to page(2, 4, reservationJson(4, "2026-09-25", "12:00:00"), reservationJson(5, "2026-09-24")),
+            3 to page(3, 4, reservationJson(6, "2026-09-23")),
+            4 to page(4, 4, reservationJson(7, "2026-09-20")),
+        )
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest) =
+                MockResponse().setBody(pages.getValue(request.requestUrl!!.queryParameter("page")!!.toInt()))
+        }
 
-        api().reservations(ReservationQuery(date = LocalDate.of(2026, 9, 25)))
+        val list = api().reservations(ReservationQuery(date = LocalDate.of(2026, 9, 25)))
 
-        val url = server.takeRequest().requestUrl!!
-        assertEquals("2026-09-25 00:00:00", url.queryParameter("dateTimeFilter[startAt]"))
-        assertEquals("2026-09-25 23:59:59", url.queryParameter("dateTimeFilter[endAt]"))
+        assertEquals(listOf(4L, 3L, 2L), list.map { it.id })
+        val first = server.takeRequest().requestUrl!!
+        assertEquals("reserve_date desc", first.queryParameter("sort"))
+        // The server-side dateTimeFilter is broken in TastyIgniter and must not be sent.
+        assertEquals(null, first.queryParameter("dateTimeFilter[startAt]"))
+        // Pages 3 and 4 lie entirely before the requested day and are never loaded.
+        val requested = (2..server.requestCount).map { server.takeRequest().requestUrl!!.queryParameter("page") }
+        assertEquals(listOf("2"), requested)
+    }
+
+    @Test
+    fun `finds an old day on a busy installation with few requests`() = runTest {
+        val newest = LocalDate.of(2026, 12, 31)
+        // 400 pages, one day per page, newest first: far beyond any fixed page cap.
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val p = request.requestUrl!!.queryParameter("page")!!.toInt()
+                val day = newest.minusDays((p - 1).toLong()).toString()
+                return MockResponse().setBody(page(p, 400, reservationJson(p * 10, day), reservationJson(p * 10 + 1, day, "12:00:00")))
+            }
+        }
+
+        val target = newest.minusDays(300)
+        val list = api().reservations(ReservationQuery(date = target))
+
+        assertEquals(listOf(3011L, 3010L), list.map { it.id })
+        assertTrue("requests: ${server.requestCount}", server.requestCount <= 12)
     }
 
     @Test
