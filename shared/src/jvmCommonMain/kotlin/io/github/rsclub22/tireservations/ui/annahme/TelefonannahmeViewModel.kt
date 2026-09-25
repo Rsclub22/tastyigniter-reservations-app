@@ -25,6 +25,10 @@ data class AnnahmeState(
     val nachname: String = "",
     val telefon: String = "",
     val notiz: String = "",
+    val email: String = "",
+    /** Begruendung fuer das Sperren des Tages, z. B. "Betriebsferien". */
+    val grund: String = "",
+    val sperrtLaeuft: Boolean = false,
     val tag: Tagesdaten? = null,
     val laden: Boolean = true,
     val speichern: Boolean = false,
@@ -39,6 +43,9 @@ data class AnnahmeState(
 
     /** Fehlermeldung des Servers zu einem Feld, etwa die Hoechstzahl an `gaeste`. */
     fun fehlerZu(feld: String): String? = feldFehler[feld]?.firstOrNull()
+
+    /** Reicht das Eingetragene, um auf eine Uhrzeit zu klicken? */
+    val gastVollstaendig: Boolean get() = nachname.isNotBlank() && telefon.isNotBlank()
 }
 
 /**
@@ -108,13 +115,49 @@ class TelefonannahmeViewModel(
 
     fun setNotiz(wert: String) = _state.update { it.copy(notiz = wert) }
 
+    fun setEmail(wert: String) = _state.update { it.copy(email = wert, feldFehler = emptyMap()) }
+
+    fun setGrund(wert: String) = _state.update { it.copy(grund = wert) }
+
     fun neuLaden() = ladeTag()
 
     fun fehlerGesehen() = _state.update { it.copy(fehler = null) }
 
     /** Bestaetigung wegraeumen und fuer den naechsten Anruf freimachen. */
     fun weiter() = _state.update {
-        it.copy(angelegt = null, nachname = "", telefon = "", notiz = "", zeit = null, feldFehler = emptyMap())
+        it.copy(
+            angelegt = null, nachname = "", telefon = "", email = "", notiz = "",
+            zeit = null, feldFehler = emptyMap(),
+        )
+    }
+
+    /**
+     * Sperrt den gezeigten Tag fuer die Online-Buchung oder gibt ihn wieder frei.
+     * Der Tag wird danach neu geholt: die Sperre steht in denselben Daten.
+     */
+    fun sperreUmschalten() {
+        val s = _state.value
+        val gesperrt = s.tag?.gesperrt ?: return
+        if (s.sperrtLaeuft) return
+
+        viewModelScope.launch {
+            _state.update { it.copy(sperrtLaeuft = true, fehler = null) }
+            try {
+                if (gesperrt) {
+                    repository.internFreigeben(s.datum)
+                } else {
+                    repository.internSperren(s.datum, s.grund)
+                }
+                _state.update { it.copy(sperrtLaeuft = false, grund = "") }
+                ladeTag()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ApiException) {
+                _state.update {
+                    it.copy(sperrtLaeuft = false, fehler = e.message, unauthorized = e.isUnauthorized)
+                }
+            }
+        }
     }
 
     private fun ladeTag() {
@@ -145,6 +188,33 @@ class TelefonannahmeViewModel(
 
     // --- Annehmen ---------------------------------------------------------------------
 
+    /**
+     * Ein Klick auf eine Uhrzeit nimmt sofort an - so arbeitet auch die interne
+     * Weboberflaeche, und am Telefon ist das der eigentliche Tempogewinn.
+     *
+     * Fehlen Name oder Telefonnummer, wird die Zeit nur gemerkt und die Felder
+     * melden sich. Das erspart einen Weg zum Server, der ohnehin mit 422
+     * zurueckkaeme, und der Klick ist nicht verloren.
+     */
+    fun zeitGeklickt(zeit: LocalTime) {
+        val s = _state.value
+        _state.update { it.copy(zeit = zeit, feldFehler = emptyMap()) }
+
+        if (!s.gastVollstaendig) {
+            _state.update {
+                it.copy(
+                    feldFehler = buildMap {
+                        if (s.nachname.isBlank()) put("nachname", listOf("Bitte den Nachnamen eintragen."))
+                        if (s.telefon.isBlank()) put("telefon", listOf("Bitte die Telefonnummer eintragen."))
+                    },
+                )
+            }
+            return
+        }
+
+        annehmen()
+    }
+
     fun annehmen() {
         val s = _state.value
         val zeit = s.zeit ?: return
@@ -160,6 +230,7 @@ class TelefonannahmeViewModel(
                         gaeste = s.gaeste,
                         nachname = s.nachname,
                         telefon = s.telefon,
+                        email = s.email,
                         notiz = s.notiz,
                         raumId = s.raumId,
                         ohneTisch = s.ohneTisch,

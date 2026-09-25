@@ -1,6 +1,9 @@
 package io.github.rsclub22.tireservations.ui.annahme
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -8,10 +11,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -28,7 +34,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -42,6 +52,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,18 +74,22 @@ import io.github.rsclub22.tireservations.data.Zeitfenster
 import io.github.rsclub22.tireservations.ui.components.ErrorCard
 import io.github.rsclub22.tireservations.ui.components.LoadingBox
 import io.github.rsclub22.tireservations.ui.components.display
-import io.github.rsclub22.tireservations.ui.components.relativeDayLabel
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
  * Telefonannahme: eintragen, waehrend der Gast am Telefon ist.
  *
- * Absichtlich knapp gehalten. Nachname und Telefonnummer genuegen, der Status ist
- * sofort bestaetigt, es wird nichts verschickt. Die Zeitfenster kommen vom Server
- * samt Belegung - auch die, die rechnerisch nicht mehr passen: das Aussortieren
- * waere hier falsch, denn genau dafuer ruft jemand an. Ob es wirklich geht,
- * entscheidet der Server beim Annehmen.
+ * Aufbau wie die interne Weboberflaeche, die dieser Schirm ersetzt - drei Karten
+ * untereinander: der Tag, die Belegung, der Gast. Der Ablauf ist derselbe: Name
+ * und Nummer eintragen, dann auf die Uhrzeit klicken, fertig. Der Klick nimmt an,
+ * das ist der eigentliche Tempogewinn.
+ *
+ * Zeitfenster, die rechnerisch nicht mehr passen, bleiben sichtbar und waehlbar:
+ * genau dafuer ruft jemand an. Ob es wirklich geht, entscheidet der Server.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -82,33 +97,35 @@ fun TelefonannahmeScreen(
     repository: ReservationRepository,
     onBack: () -> Unit,
     onUnauthorized: () -> Unit,
-    startdatum: java.time.LocalDate = java.time.LocalDate.now(),
+    startdatum: LocalDate = LocalDate.now(),
 ) {
     // Der Schluessel haengt am Startdatum: kommt man aus dem Monatskalender mit
     // einem anderen Tag herein, soll der Schirm dort stehen und nicht den
     // gemerkten Zustand des letzten Aufrufs zeigen.
-    val vm: TelefonannahmeViewModel = viewModel(key = "telefonannahme-${'$'}startdatum") {
+    val vm: TelefonannahmeViewModel = viewModel(key = "telefonannahme-$startdatum") {
         TelefonannahmeViewModel(repository, startdatum)
     }
     val state by vm.state.collectAsStateWithLifecycle()
-    var showDate by remember { mutableStateOf(false) }
+    var kalender by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.unauthorized) { if (state.unauthorized) onUnauthorized() }
 
-    if (showDate) {
-        val pickerState = rememberDatePickerStateFor(state.datum)
+    if (kalender) {
+        val zustand = rememberDatePickerState(
+            initialSelectedDateMillis = state.datum.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(),
+        )
         DatePickerDialog(
-            onDismissRequest = { showDate = false },
+            onDismissRequest = { kalender = false },
             confirmButton = {
                 TextButton(onClick = {
-                    pickerState.selectedDateMillis?.let { ms ->
-                        vm.setDatum(Instant.ofEpochMilli(ms).atZone(ZoneOffset.UTC).toLocalDate())
+                    zustand.selectedDateMillis?.let {
+                        vm.setDatum(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate())
                     }
-                    showDate = false
+                    kalender = false
                 }) { Text("Übernehmen") }
             },
-            dismissButton = { TextButton(onClick = { showDate = false }) { Text("Abbrechen") } },
-        ) { DatePicker(state = pickerState) }
+            dismissButton = { TextButton(onClick = { kalender = false }) { Text("Abbrechen") } },
+        ) { DatePicker(state = zustand) }
     }
 
     Scaffold(
@@ -128,80 +145,25 @@ fun TelefonannahmeScreen(
             )
         },
     ) { padding ->
-        Column(
-            Modifier.fillMaxSize().padding(padding).imePadding()
-                .verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Datumszeile(
-                datum = state.datum,
-                onZurueck = { vm.tagWeiter(-1) },
-                onVor = { vm.tagWeiter(1) },
-                onKalender = { showDate = true },
-            )
+        BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+            // Am Telefon stehen die Gastfelder untereinander, auf dem Desktop
+            // nebeneinander wie auf der Weboberflaeche.
+            val breit = maxWidth >= 720.dp
 
-            Gaestezahl(
-                gaeste = state.gaeste,
-                fehler = state.fehlerZu("gaeste"),
-                onAendern = vm::setGaeste,
-            )
+            Column(
+                Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                state.fehler?.let { ErrorCard(it, onRetry = vm::neuLaden) }
 
-            state.fehler?.let { ErrorCard(it, onRetry = vm::neuLaden) }
+                TagKarte(state, vm, breit) { kalender = true }
 
-            val tag = state.tag
-            when {
-                state.laden && tag == null -> LoadingBox()
-                tag != null -> {
-                    Tageskopf(tag)
-
-                    Zeitfenstergitter(
-                        belegung = tag.belegung,
-                        gewaehlt = state.zeit,
-                        onWaehlen = vm::setZeit,
-                    )
-
-                    if (tag.raeume.isNotEmpty()) {
-                        Raumwahl(tag, state.raumId, state.ohneTisch, vm::setRaum)
-                    }
-
-                    OhneTischSchalter(state.ohneTisch, vm::setOhneTisch)
-
-                    HorizontalDivider()
-
-                    Gastfelder(
-                        nachname = state.nachname,
-                        telefon = state.telefon,
-                        notiz = state.notiz,
-                        nachnameFehler = state.fehlerZu("nachname"),
-                        telefonFehler = state.fehlerZu("telefon"),
-                        onNachname = vm::setNachname,
-                        onTelefon = vm::setTelefon,
-                        onNotiz = vm::setNotiz,
-                    )
-
-                    Button(
-                        onClick = vm::annehmen,
-                        enabled = state.bereit,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (state.speichern) {
-                            CircularProgressIndicator(Modifier.width(18.dp), strokeWidth = 2.dp)
-                            Spacer(Modifier.width(12.dp))
-                        }
-                        Text(
-                            when {
-                                state.zeit == null -> "Zuerst eine Uhrzeit wählen"
-                                else -> "Annehmen für ${state.zeit.display()} Uhr"
-                            },
-                        )
-                    }
-
-                    state.angelegt?.let { angelegt ->
-                        Bestaetigung(
-                            text = "#${angelegt.id} · ${angelegt.zeit.display()} · ${angelegt.gaeste} Personen · " +
-                                "${angelegt.name} · ${angelegt.tischeText}",
-                            onWeiter = vm::weiter,
-                        )
+                val tag = state.tag
+                when {
+                    state.laden && tag == null -> LoadingBox()
+                    tag != null -> {
+                        BelegungKarte(state, tag, vm)
+                        GastKarte(state, vm, breit)
                     }
                 }
             }
@@ -209,255 +171,438 @@ fun TelefonannahmeScreen(
     }
 }
 
+// --- Karte 1: Tag -------------------------------------------------------------------
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun Datumszeile(
-    datum: java.time.LocalDate,
-    onZurueck: () -> Unit,
-    onVor: () -> Unit,
+private fun TagKarte(
+    state: AnnahmeState,
+    vm: TelefonannahmeViewModel,
+    breit: Boolean,
     onKalender: () -> Unit,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onZurueck) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Tag zurück")
+    Karte("TAG") {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            schnellwahl(LocalDate.now()).forEach { (datum, beschriftung) ->
+                FilterChip(
+                    selected = state.datum == datum,
+                    onClick = { vm.setDatum(datum) },
+                    label = { Text(beschriftung) },
+                )
+            }
+            OutlinedButton(onClick = onKalender) {
+                Icon(Icons.Outlined.CalendarMonth, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(state.datum.display())
+            }
         }
-        Column(Modifier.weight(1f)) {
-            Text(datum.display(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text(
-                relativeDayLabel(datum),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        IconButton(onClick = onKalender) {
-            Icon(Icons.Outlined.CalendarMonth, contentDescription = "Datum wählen")
-        }
-        IconButton(onClick = onVor) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Tag vor")
-        }
-    }
-}
 
-@Composable
-private fun Gaestezahl(gaeste: Int, fehler: String?, onAendern: (Int) -> Unit) {
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Personen", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
-            FilledTonalIconButton(onClick = { onAendern(gaeste - 1) }, enabled = gaeste > 1) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            IconButton(onClick = { vm.tagWeiter(-1) }) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Tag zurück")
+            }
+            IconButton(onClick = { vm.tagWeiter(1) }) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Tag vor")
+            }
+
+            Text("Personen", style = MaterialTheme.typography.labelLarge)
+            FilledTonalIconButton(onClick = { vm.setGaeste(state.gaeste - 1) }, enabled = state.gaeste > 1) {
                 Icon(Icons.Outlined.Remove, contentDescription = "weniger")
             }
             Text(
-                gaeste.toString(),
-                Modifier.padding(horizontal = 20.dp),
+                state.gaeste.toString(),
+                Modifier.widthIn(min = 34.dp),
                 style = MaterialTheme.typography.headlineSmall,
             )
-            FilledTonalIconButton(onClick = { onAendern(gaeste + 1) }) {
+            FilledTonalIconButton(onClick = { vm.setGaeste(state.gaeste + 1) }) {
                 Icon(Icons.Outlined.Add, contentDescription = "mehr")
             }
+
+            if (breit) {
+                Spacer(Modifier.width(8.dp))
+                Raumwahl(state, vm, Modifier.widthIn(min = 220.dp))
+            }
         }
-        // Hier landet die Hoechstzahl aus einem Sperrvermerk, wenn der Server sie meldet.
-        fehler?.let {
+
+        state.fehlerZu("gaeste")?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+
+        if (!breit) Raumwahl(state, vm, Modifier.fillMaxWidth())
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Ohne Tisch und ohne Raum", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Wenn die automatische Vergabe nicht passt.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = state.ohneTisch, onCheckedChange = vm::setOhneTisch)
+        }
+
+        HorizontalDivider()
+
+        Sperrbereich(state, vm, breit)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun Raumwahl(state: AnnahmeState, vm: TelefonannahmeViewModel, modifier: Modifier = Modifier) {
+    var offen by remember { mutableStateOf(false) }
+    val raeume = state.tag?.raeume.orEmpty()
+    val gewaehlt = raeume.firstOrNull { it.id == state.raumId }
+
+    ExposedDropdownMenuBox(expanded = offen, onExpandedChange = { offen = !offen }, modifier = modifier) {
+        OutlinedTextField(
+            value = gewaehlt?.let { "${it.name} (bis ${it.maxPlaetze})" } ?: "Tisch (automatisch)",
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Raum") },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = offen) },
+            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
+        )
+        ExposedDropdownMenu(expanded = offen, onDismissRequest = { offen = false }) {
+            DropdownMenuItem(
+                text = { Text("Tisch (automatisch)") },
+                onClick = { vm.setRaum(null); offen = false },
+            )
+            raeume.forEach { raum ->
+                DropdownMenuItem(
+                    text = { Text("${raum.name} (bis ${raum.maxPlaetze})") },
+                    onClick = { vm.setRaum(raum.id); offen = false },
+                )
+            }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Tageskopf(tag: Tagesdaten) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (tag.gesperrt) {
-            Hinweis(
-                "Dieser Tag ist für die Online-Buchung gesperrt" +
-                    tag.grund.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty(),
-                MaterialTheme.colorScheme.errorContainer,
-                MaterialTheme.colorScheme.onErrorContainer,
+private fun Sperrbereich(state: AnnahmeState, vm: TelefonannahmeViewModel, breit: Boolean) {
+    val gesperrt = state.tag?.gesperrt == true
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (!gesperrt) {
+            OutlinedTextField(
+                value = state.grund,
+                onValueChange = vm::setGrund,
+                placeholder = { Text("Grund (optional), z. B. Betriebsferien") },
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            Text(
+                "Dieser Tag ist gesperrt" + state.tag.grund.takeIf { it.isNotBlank() }
+                    ?.let { ": $it" }.orEmpty(),
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
             )
         }
 
+        OutlinedButton(onClick = vm::sperreUmschalten, enabled = !state.sperrtLaeuft) {
+            Text(if (gesperrt) "Freigeben" else "Diesen Tag sperren")
+        }
+    }
+
+    val sperren = state.tag?.sperren.orEmpty()
+    if (sperren.isNotEmpty()) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Gesperrt:",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            sperren.keys.sorted().forEach { text ->
+                val datum = runCatching { LocalDate.parse(text) }.getOrNull()
+                Text(
+                    datum?.format(KURZ) ?: text,
+                    Modifier.clickable(enabled = datum != null) { datum?.let(vm::setDatum) },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
+// --- Karte 2: Belegung --------------------------------------------------------------
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun BelegungKarte(state: AnnahmeState, tag: Tagesdaten, vm: TelefonannahmeViewModel) {
+    Karte("BELEGUNG AM ${tag.datum.format(LANG).uppercase()}") {
         // Der Text eines Sperrvermerks ist am Telefon oft die wichtigste Angabe des
         // Tages - dort stehen die Essenszeiten und die Hoechstzahl.
         tag.vermerke.forEach { vermerk ->
-            Hinweis(
-                vermerk.kommentar.ifBlank { "Sperrvermerk ohne Text" },
-                MaterialTheme.colorScheme.tertiaryContainer,
-                MaterialTheme.colorScheme.onTertiaryContainer,
-            )
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                ),
+            ) {
+                Text(
+                    vermerk.kommentar.ifBlank { "Sperrvermerk ohne Text" },
+                    Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                )
+            }
         }
 
         Text(
             buildString {
-                append("${tag.reservierungen.count { !it.istVermerk }} Reservierungen")
-                append(" · ${tag.gaesteGesamt} Gäste")
-                if (tag.maxPax != null) append(" · Höchstzahl ${tag.maxPax}")
-                else append(" · ${tag.tischeGesamt} Tische, ${tag.plaetzeGesamt} Plätze")
+                if (tag.maxPax != null) {
+                    append("Höchstens ${tag.maxPax} Plätze")
+                } else {
+                    append("${tag.tischeGesamt} Tische · ${tag.plaetzeGesamt} Plätze gesamt")
+                }
+                append(" · ${tag.reservierungen.count { !it.istVermerk }} Reservierungen an diesem Tag")
             },
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        if (tag.belegung.isEmpty()) {
+            Text(
+                "Für diesen Tag sind keine Zeiten vorgesehen.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@Karte
+        }
+
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            tag.belegung.forEach { fenster ->
+                Zeitfeld(
+                    fenster = fenster,
+                    gewaehlt = fenster.zeit == state.zeit,
+                    laeuft = state.speichern && fenster.zeit == state.zeit,
+                    onClick = { vm.zeitGeklickt(fenster.zeit) },
+                )
+            }
+        }
+
+        Text(
+            "Ein Klick auf die Uhrzeit nimmt die Reservierung mit den unten eingetragenen Daten an. " +
+                "Grau bedeutet: für ${state.gaeste} " +
+                (if (state.gaeste == 1) "Person" else "Personen") + " ist kein Tisch mehr frei.",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
 @Composable
-private fun Hinweis(text: String, hintergrund: androidx.compose.ui.graphics.Color, vordergrund: androidx.compose.ui.graphics.Color) {
-    Card(colors = CardDefaults.cardColors(containerColor = hintergrund)) {
-        Text(
-            text,
-            Modifier.padding(12.dp),
-            style = MaterialTheme.typography.bodyMedium,
-            color = vordergrund,
-        )
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun Zeitfenstergitter(
-    belegung: List<Zeitfenster>,
-    gewaehlt: java.time.LocalTime?,
-    onWaehlen: (java.time.LocalTime) -> Unit,
+private fun Zeitfeld(
+    fenster: Zeitfenster,
+    gewaehlt: Boolean,
+    laeuft: Boolean,
+    onClick: () -> Unit,
 ) {
-    Column {
-        Text("Uhrzeit", style = MaterialTheme.typography.titleSmall)
-        Spacer(Modifier.width(8.dp))
+    val farben = MaterialTheme.colorScheme
 
-        if (belegung.isEmpty()) {
-            Text(
-                "Für diesen Tag sind keine Zeiten vorgesehen.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            return@Column
-        }
+    // Die farbige Kante links bedeutet "wird knapp" - auf der Weboberflaeche bei
+    // ein oder zwei freien Tischen. Nicht dasselbe wie grau: grau heisst, dass fuer
+    // diese Personenzahl gar keiner mehr passt.
+    val kante = when {
+        gewaehlt -> farben.primary
+        fenster.knapp -> farben.tertiary
+        else -> farben.outlineVariant
+    }
 
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            belegung.forEach { fenster ->
-                FilterChip(
-                    selected = fenster.zeit == gewaehlt,
-                    onClick = { onWaehlen(fenster.zeit) },
-                    label = {
-                        Column {
-                            Text(fenster.zeit.display())
-                            Text(
-                                fenster.anzeige,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (fenster.passt) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                } else {
-                                    MaterialTheme.colorScheme.error
-                                },
-                            )
-                        }
-                    },
+    Card(
+        onClick = onClick,
+        colors = CardDefaults.cardColors(
+            containerColor = when {
+                gewaehlt -> farben.primaryContainer
+                fenster.passt -> farben.surface
+                else -> farben.surfaceVariant.copy(alpha = 0.6f)
+            },
+        ),
+        border = BorderStroke(if (fenster.knapp || gewaehlt) 2.dp else 1.dp, kante),
+        shape = RoundedCornerShape(6.dp),
+    ) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column {
+                Text(
+                    fenster.zeit.display(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (fenster.passt) farben.onSurface else farben.onSurfaceVariant,
                 )
+                Text(
+                    fenster.anzeige,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (fenster.passt) farben.onSurfaceVariant else farben.error,
+                )
+            }
+            if (laeuft) {
+                Spacer(Modifier.width(10.dp))
+                CircularProgressIndicator(Modifier.width(16.dp).height(16.dp), strokeWidth = 2.dp)
             }
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+// --- Karte 3: Gast ------------------------------------------------------------------
+
 @Composable
-private fun Raumwahl(tag: Tagesdaten, raumId: Long?, ohneTisch: Boolean, onWaehlen: (Long?) -> Unit) {
-    Column {
-        Text("Raum (statt Tisch)", style = MaterialTheme.typography.titleSmall)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = raumId == null && !ohneTisch,
-                onClick = { onWaehlen(null) },
-                label = { Text("Tisch automatisch") },
-            )
-            tag.raeume.forEach { raum ->
-                FilterChip(
-                    selected = raumId == raum.id,
-                    onClick = { onWaehlen(raum.id) },
-                    label = { Text("${raum.name} (bis ${raum.maxPlaetze})") },
+private fun GastKarte(state: AnnahmeState, vm: TelefonannahmeViewModel, breit: Boolean) {
+    Karte("GAST") {
+        if (breit) {
+            // Nebeneinander wie auf der Weboberflaeche. weight() gibt es nur
+            // innerhalb der Row, deshalb stehen die Aufrufe zweimal da statt
+            // einmal in einer Hilfsfunktion.
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Feld(
+                    state.nachname, vm::setNachname, "Nachname *", state.fehlerZu("nachname"),
+                    KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
+                    Modifier.weight(1f),
+                )
+                Feld(
+                    state.telefon, vm::setTelefon, "Telefon *", state.fehlerZu("telefon"),
+                    KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
+                    Modifier.weight(1f),
+                )
+                Feld(
+                    state.email, vm::setEmail, "E-Mail (optional)", state.fehlerZu("email"),
+                    KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                    Modifier.weight(1f),
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun OhneTischSchalter(an: Boolean, onAendern: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            Text("Ohne Tisch und ohne Raum", style = MaterialTheme.typography.titleSmall)
-            Text(
-                "Für Fälle, in denen die automatische Vergabe nicht passt. Die Zuordnung " +
-                    "macht dann jemand von Hand.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+        } else {
+            Feld(
+                state.nachname, vm::setNachname, "Nachname *", state.fehlerZu("nachname"),
+                KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
+                Modifier.fillMaxWidth(),
+            )
+            Feld(
+                state.telefon, vm::setTelefon, "Telefon *", state.fehlerZu("telefon"),
+                KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
+                Modifier.fillMaxWidth(),
+            )
+            Feld(
+                state.email, vm::setEmail, "E-Mail (optional)", state.fehlerZu("email"),
+                KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                Modifier.fillMaxWidth(),
             )
         }
-        Switch(checked = an, onCheckedChange = onAendern)
-    }
-}
 
-@Composable
-private fun Gastfelder(
-    nachname: String,
-    telefon: String,
-    notiz: String,
-    nachnameFehler: String?,
-    telefonFehler: String?,
-    onNachname: (String) -> Unit,
-    onTelefon: (String) -> Unit,
-    onNotiz: (String) -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedTextField(
-            value = nachname,
-            onValueChange = onNachname,
-            label = { Text("Nachname") },
-            singleLine = true,
-            isError = nachnameFehler != null,
-            supportingText = nachnameFehler?.let { { Text(it) } },
-            keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Words,
-                imeAction = ImeAction.Next,
-            ),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = telefon,
-            onValueChange = onTelefon,
-            label = { Text("Telefon") },
-            singleLine = true,
-            isError = telefonFehler != null,
-            supportingText = telefonFehler?.let { { Text(it) } },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
-            value = notiz,
-            onValueChange = onNotiz,
+            value = state.notiz,
+            onValueChange = vm::setNotiz,
             label = { Text("Notiz (optional)") },
             minLines = 2,
             modifier = Modifier.fillMaxWidth(),
         )
-    }
-}
 
-@Composable
-private fun Bestaetigung(text: String, onWeiter: () -> Unit) {
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        ),
-    ) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Angenommen", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Text(text, style = MaterialTheme.typography.bodyMedium)
-            OutlinedButton(onClick = onWeiter) { Text("Nächster Anruf") }
+        Button(
+            onClick = vm::annehmen,
+            enabled = state.bereit,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            if (state.speichern) {
+                CircularProgressIndicator(Modifier.width(18.dp).height(18.dp), strokeWidth = 2.dp)
+                Spacer(Modifier.width(12.dp))
+            }
+            Text(
+                if (state.zeit == null) {
+                    "Reservierung annehmen"
+                } else {
+                    "Reservierung annehmen für ${state.zeit.display()} Uhr"
+                },
+            )
+        }
+
+        Text(
+            "Wird sofort als bestätigt gespeichert. Der Tisch wird automatisch zugewiesen. " +
+                "Es wird keine E-Mail verschickt – weder an den Gast noch ans Haus. " +
+                "Ohne Klick auf eine Uhrzeit oben fehlt die Zeit.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        state.angelegt?.let { angelegt ->
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                ),
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Angenommen",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        "#${angelegt.id} · ${angelegt.zeit.display()} Uhr · ${angelegt.gaeste} Personen · " +
+                            "${angelegt.name} · ${angelegt.tischeText}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    OutlinedButton(onClick = vm::weiter) { Text("Nächster Anruf") }
+                }
+            }
         }
     }
 }
 
-/**
- * Der Zustand des Datumswählers haengt am Tag: wechselt der Tag, soll der Kalender
- * beim naechsten Oeffnen dort stehen und nicht beim alten Datum.
- */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun rememberDatePickerStateFor(datum: java.time.LocalDate) =
-    androidx.compose.material3.rememberDatePickerState(
-        initialSelectedDateMillis = datum.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(),
+private fun Feld(
+    wert: String,
+    onWert: (String) -> Unit,
+    beschriftung: String,
+    fehler: String?,
+    optionen: KeyboardOptions,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = wert,
+        onValueChange = onWert,
+        label = { Text(beschriftung) },
+        singleLine = true,
+        isError = fehler != null,
+        supportingText = fehler?.let { { Text(it) } },
+        keyboardOptions = optionen,
+        modifier = modifier,
     )
+}
+
+// --- Bausteine ----------------------------------------------------------------------
+
+@Composable
+private fun Karte(titel: String, inhalt: @Composable () -> Unit) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                titel,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            inhalt()
+        }
+    }
+}
+
+/** Heute, Morgen und die drei folgenden Tage - die Spanne, in der am Telefon gebucht wird. */
+private fun schnellwahl(heute: LocalDate): List<Pair<LocalDate, String>> = listOf(
+    heute to "Heute",
+    heute.plusDays(1) to "Morgen",
+) + (2L..4L).map { heute.plusDays(it) to heute.plusDays(it).format(KURZ) }
+
+private val KURZ = DateTimeFormatter.ofPattern("EE d.M.", Locale.GERMAN)
+private val LANG = DateTimeFormatter.ofPattern("EEEE, d. MMMM", Locale.GERMAN)
