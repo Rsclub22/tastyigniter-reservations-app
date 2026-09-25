@@ -167,7 +167,7 @@ class TastyIgniterApi(
                 .build()
             try {
                 client.newCall(request).execute().use { response ->
-                    val text = response.body?.string().orEmpty()
+                    val text = response.body.string()
                     val parsed = text.takeIf { it.isNotBlank() }
                         ?.let { runCatching { json.parseToJsonElement(it) }.getOrNull() }
                         // The parser accepts bare literals, so an HTML page could slip through as a primitive.

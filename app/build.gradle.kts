@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -11,7 +10,7 @@ val releaseKeystore: String? = System.getenv("ANDROID_KEYSTORE_FILE")
 
 android {
     namespace = "io.github.rsclub22.tireservations"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "io.github.rsclub22.tireservations"
