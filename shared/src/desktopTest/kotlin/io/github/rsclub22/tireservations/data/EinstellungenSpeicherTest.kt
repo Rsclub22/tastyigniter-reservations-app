@@ -41,9 +41,14 @@ class EinstellungenSpeicherTest {
     /**
      * DataStore laesst je Datei nur eine aktive Instanz im Prozess zu; jede
      * bekommt daher einen eigenen Gueltigkeitsbereich, der danach endet.
+     *
+     * Auf das Ende wird gewartet: `cancel()` stoesst das Abraeumen nur an, und die
+     * naechste Instanz sieht die Datei sonst je nach Laune der Maschine noch als
+     * belegt - "There are multiple DataStores active for the same file".
      */
     private fun <T> mitSpeicher(datei: File, verloren: () -> Unit = {}, block: suspend (DataStore<Preferences>) -> T): T {
-        val bereich = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        val auftrag = SupervisorJob()
+        val bereich = CoroutineScope(Dispatchers.IO + auftrag)
         try {
             val speicher = PreferenceDataStoreFactory.createWithPath(
                 corruptionHandler = ReplaceFileCorruptionHandler { verloren(); emptyPreferences() },
@@ -52,7 +57,8 @@ class EinstellungenSpeicherTest {
 
             return runBlocking { block(speicher) }
         } finally {
-            bereich.cancel()
+            auftrag.cancel()
+            runBlocking { auftrag.join() }
         }
     }
 
