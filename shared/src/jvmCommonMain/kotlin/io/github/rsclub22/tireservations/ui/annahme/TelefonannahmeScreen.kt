@@ -63,6 +63,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -163,8 +165,22 @@ fun TelefonannahmeScreen(
                 when {
                     state.laden && tag == null -> LoadingBox()
                     tag != null -> {
-                        BelegungKarte(state, tag, vm)
-                        GastKarte(state, vm, breit)
+                        // Am Telefon steht der Gast vor der Belegung, auf dem
+                        // Desktop danach wie auf /intern.
+                        //
+                        // Der Grund ist der Ablauf: Name und Nummer werden
+                        // getippt, waehrend der Gast redet, und der Klick auf die
+                        // Uhrzeit nimmt an. Stehen die Zeiten oben, tippt man
+                        // unten und muss zum Abschliessen wieder hoch - auf dem
+                        // breiten Schirm faellt das nicht auf, weil dort beides
+                        // gleichzeitig zu sehen ist.
+                        if (breit) {
+                            BelegungKarte(state, tag, vm, breit)
+                            GastKarte(state, vm, breit)
+                        } else {
+                            GastKarte(state, vm, breit)
+                            BelegungKarte(state, tag, vm, breit)
+                        }
                     }
                 }
             }
@@ -201,17 +217,33 @@ private fun TagKarte(
             }
         }
 
+        // Tagespfeile und Personenzahl standen in einer Reihe nebeneinander -
+        // vier Knoepfe dicht an dicht, von denen zwei den Tag und zwei die
+        // Personenzahl aendern. Am Telefon greift man da im Eifer daneben, und
+        // der Fehlgriff faellt erst auf, wenn die Reservierung am falschen Tag
+        // steht. Jetzt zwei getrennte Zeilen.
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             IconButton(onClick = { vm.tagWeiter(-1) }) {
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Tag zurück")
             }
+            Text(
+                state.datum.format(LANG),
+                Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+            )
             IconButton(onClick = { vm.tagWeiter(1) }) {
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Tag vor")
             }
+        }
 
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Text("Personen", style = MaterialTheme.typography.labelLarge)
             FilledTonalIconButton(onClick = { vm.setGaeste(state.gaeste - 1) }, enabled = state.gaeste > 1) {
                 Icon(Icons.Outlined.Remove, contentDescription = "weniger")
@@ -220,6 +252,7 @@ private fun TagKarte(
                 state.gaeste.toString(),
                 Modifier.widthIn(min = 34.dp),
                 style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center,
             )
             FilledTonalIconButton(onClick = { vm.setGaeste(state.gaeste + 1) }) {
                 Icon(Icons.Outlined.Add, contentDescription = "mehr")
@@ -251,7 +284,33 @@ private fun TagKarte(
 
         HorizontalDivider()
 
-        Sperrbereich(state, vm, breit)
+        // Einen Tag zu sperren ist Verwaltung und nicht Annahme - am Telefon
+        // schob das Feld samt Knopf und Sperrtagsliste die Zeiten weit nach
+        // unten. Auf dem breiten Schirm ist der Platz da, dort bleibt es offen.
+        if (breit) {
+            Sperrbereich(state, vm, breit)
+        } else {
+            var offen by remember { mutableStateOf(false) }
+            val gesperrt = state.tag?.gesperrt == true
+
+            // Ist der Tag gesperrt, muss man das sehen, ohne aufzuklappen.
+            TextButton(onClick = { offen = !offen }) {
+                Text(
+                    when {
+                        gesperrt -> "Dieser Tag ist gesperrt – antippen zum Freigeben"
+                        offen -> "Tag sperren ausblenden"
+                        else -> "Diesen Tag sperren …"
+                    },
+                    color = if (gesperrt) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                )
+            }
+
+            if (offen || gesperrt) Sperrbereich(state, vm, breit)
+        }
     }
 }
 
@@ -361,7 +420,7 @@ private fun Sperrbereich(state: AnnahmeState, vm: TelefonannahmeViewModel, breit
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun BelegungKarte(state: AnnahmeState, tag: Tagesdaten, vm: TelefonannahmeViewModel) {
+private fun BelegungKarte(state: AnnahmeState, tag: Tagesdaten, vm: TelefonannahmeViewModel, breit: Boolean) {
     Karte("BELEGUNG AM ${tag.datum.format(LANG).uppercase()}") {
         // Der Text eines Sperrvermerks ist am Telefon oft die wichtigste Angabe des
         // Tages - dort stehen die Essenszeiten und die Hoechstzahl.
@@ -415,9 +474,14 @@ private fun BelegungKarte(state: AnnahmeState, tag: Tagesdaten, vm: Telefonannah
             return@Karte
         }
 
+        // Am Telefon zwei gleich breite Spalten statt frei fliessender Kacheln:
+        // die Zeiten standen sonst je nach Textlaenge mal ein-, mal zweispaltig,
+        // und die Uhrzeit sprang beim Blaettern durch die Tage hin und her. Wer
+        // im Gespraech eine Zeit sucht, braucht ein ruhiges Raster.
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
+            maxItemsInEachRow = if (breit) Int.MAX_VALUE else 2,
         ) {
             tag.belegung.forEach { fenster ->
                 Zeitfeld(
@@ -425,13 +489,20 @@ private fun BelegungKarte(state: AnnahmeState, tag: Tagesdaten, vm: Telefonannah
                     gewaehlt = fenster.zeit == state.zeit,
                     laeuft = state.speichern && fenster.zeit == state.zeit,
                     onClick = { vm.zeitGeklickt(fenster.zeit) },
+                    modifier = if (breit) Modifier else Modifier.weight(1f),
                 )
             }
+
+            // Eine ungerade Anzahl liesse die letzte Kachel ueber die volle Breite
+            // laufen; die leere Haelfte haelt das Raster gerade.
+            if (!breit && tag.belegung.size % 2 == 1) Spacer(Modifier.weight(1f))
         }
 
         Text(
             buildString {
-                append("Ein Klick auf die Uhrzeit nimmt die Reservierung mit den unten eingetragenen Daten an. ")
+                append("Ein Klick auf die Uhrzeit nimmt die Reservierung mit den ")
+                append(if (breit) "unten" else "oben")
+                append(" eingetragenen Daten an. ")
 
                 // Der Tag kann gemischt sein: ein Abendvermerk laesst den
                 // Mittagstisch offen. Dann steht hier beides, sonst raet man am
@@ -464,6 +535,7 @@ private fun Zeitfeld(
     gewaehlt: Boolean,
     laeuft: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val farben = MaterialTheme.colorScheme
 
@@ -487,9 +559,10 @@ private fun Zeitfeld(
         ),
         border = BorderStroke(if (fenster.knapp || gewaehlt) 2.dp else 1.dp, kante),
         shape = RoundedCornerShape(6.dp),
+        modifier = modifier,
     ) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column {
+            Column(Modifier.weight(1f, fill = false)) {
                 Text(
                     fenster.zeit.display(),
                     style = MaterialTheme.typography.titleMedium,
@@ -500,6 +573,10 @@ private fun Zeitfeld(
                     fenster.anzeige,
                     style = MaterialTheme.typography.labelSmall,
                     color = if (fenster.passt) farben.onSurfaceVariant else farben.error,
+                    // In der schmalen Kachel brach sonst das "Pl." in eine zweite
+                    // Zeile und machte jede Kachel eine Zeile hoeher.
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             if (laeuft) {
@@ -583,7 +660,7 @@ private fun GastKarte(state: AnnahmeState, vm: TelefonannahmeViewModel, breit: B
         Text(
             "Wird sofort als bestätigt gespeichert. Der Tisch wird automatisch zugewiesen. " +
                 "Es wird keine E-Mail verschickt – weder an den Gast noch ans Haus. " +
-                "Ohne Klick auf eine Uhrzeit oben fehlt die Zeit.",
+                "Ohne Klick auf eine Uhrzeit ${if (breit) "oben" else "unten"} fehlt die Zeit.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
