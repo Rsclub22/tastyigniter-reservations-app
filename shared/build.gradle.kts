@@ -86,12 +86,34 @@ kotlin {
             implementation(libs.kotlinx.coroutines.test)
             implementation(libs.okhttp.mockwebserver)
         }
+
+        getByName("desktopTest").dependencies {
+            // Nur fuer den Fingerschub-Test: der braucht eine echte Compose-Szene,
+            // in die sich ein Mausereignis mit Zeigertyp "Maus" schicken laesst.
+            // Die Zuordnung Bibliothek -> Version kommt wieder von JetBrains, s.
+            // Dateikopf. Laeuft ohne Bildschirm - Skia zeichnet in einen Puffer.
+            implementation(compose.desktop.uiTestJUnit4)
+            implementation(compose.desktop.currentOs)
+        }
     }
 }
 
 compose.desktop {
     application {
         mainClass = "io.github.rsclub22.tireservations.MainKt"
+
+        // Aus diesem JDK schneidet jlink das mitgelieferte JRE. Damit entscheidet
+        // es auch, welche CPU das Programm spaeter braucht - und manche
+        // Distributionen bauen ihr JDK fuer x86-64-v4 (CachyOS etwa, also der
+        // Entwicklungsrechner). Das Ergebnis laeuft dann nur auf Rechnern mit
+        // AVX-512. Der Tresenrechner ist ein Kaby Lake ohne AVX-512 und bricht
+        // mit "CPU ISA level is lower than required" ab, noch bevor die App
+        // startet - kein Fenster, keine Meldung im Log.
+        //
+        // JPACKAGE_JAVA_HOME zeigt darum auf ein generisch gebautes JDK. Die CI
+        // braucht es nicht (temurin 17 ist ohnehin baseline); ohne die Variable
+        // bleibt alles wie vorher.
+        System.getenv("JPACKAGE_JAVA_HOME")?.takeIf { it.isNotBlank() }?.let { javaHome = it }
 
         // Die Version soll nur an einer Stelle stehen. Main.kt liest sie als
         // System-Property; ohne das Argument (Start aus der IDE) meldet sie "dev"
