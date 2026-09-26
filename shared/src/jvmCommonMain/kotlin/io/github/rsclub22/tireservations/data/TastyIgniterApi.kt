@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.JsonPrimitive
@@ -367,7 +368,12 @@ class TastyIgniterApi(
 
     /**
      * A blank e-mail is left out when creating, so installations without the e-mail requirement
-     * accept it. When updating it is sent empty, so a removed address is actually cleared.
+     * accept it. When updating it is sent as JSON null, so a removed address is actually cleared.
+     *
+     * Ausdruecklich null und nicht "": Laravel ueberspringt bei der Regel `nullable`
+     * nur echtes null. Ein Leerstring laeuft weiter in `email:filter` und faellt
+     * durch - eine Telefonbestellung ohne Adresse liesse sich dann gar nicht
+     * aendern, obwohl "keine Adresse" genau das ist, was gemeint war.
      */
     private fun ReservationDraft.toJson(isUpdate: Boolean): JsonObject = buildJsonObject {
         put("location_id", locationId)
@@ -376,7 +382,7 @@ class TastyIgniterApi(
         put("guest_num", guestNum)
         put("first_name", firstName.trim())
         put("last_name", lastName.trim())
-        if (email.isNotBlank() || isUpdate) put("email", email.trim())
+        if (email.isNotBlank()) put("email", email.trim()) else if (isUpdate) put("email", JsonNull)
         // Status changes of existing reservations go through the status endpoint only.
         if (!isUpdate) statusId?.let { put("status_id", it) }
         put("telephone", telephone.trim())

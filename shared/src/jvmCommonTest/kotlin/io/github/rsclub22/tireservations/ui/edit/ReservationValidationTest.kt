@@ -27,6 +27,34 @@ class ReservationValidationTest {
         )
     }
 
+    /**
+     * Eine Telefonbestellung hat nie einen Vornamen - die Telefonannahme fragt
+     * gar keinen ab - und meist keine E-Mail, oft auch keine Nummer. Verlangte
+     * das Bearbeiten dasselbe wie das Anlegen, liesse sich an so einem Eintrag
+     * nichts mehr aendern, ohne Daten zu erfinden.
+     */
+    @Test
+    fun `editing an existing reservation does not demand what the phone intake never asked`() {
+        val telefonbestellung = ReservationDraft(
+            locationId = 1, guestNum = 4, firstName = "", lastName = "Mustermann",
+            email = "", telephone = "",
+        )
+        assertTrue(ReservationEditViewModel.validate(telefonbestellung, isNew = false).isEmpty())
+    }
+
+    @Test
+    fun `a new reservation still needs first name, last name and telephone`() {
+        val ohneAlles = ReservationDraft(locationId = 1, guestNum = 4, lastName = "Mustermann")
+        val errors = ReservationEditViewModel.validate(ohneAlles, isNew = true)
+        assertEquals(setOf("first_name", "telephone"), errors.keys)
+    }
+
+    @Test
+    fun `even when editing, some name has to remain`() {
+        val namenlos = ReservationDraft(locationId = 1, guestNum = 2, firstName = "", lastName = "")
+        assertTrue("last_name" in ReservationEditViewModel.validate(namenlos, isNew = false))
+    }
+
     @Test
     fun `duration from start and end`() {
         assertEquals(150, ReservationEditViewModel.durationBetween(LocalTime.of(18, 30), LocalTime.of(21, 0)))

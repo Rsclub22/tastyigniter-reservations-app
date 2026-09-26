@@ -114,7 +114,7 @@ class ReservationEditViewModel(
 
     fun save() {
         val s = _state.value
-        val errors = validate(s.draft)
+        val errors = validate(s.draft, s.isNew)
         if (errors.isNotEmpty()) {
             _state.update { it.copy(fieldErrors = errors, error = "Bitte die markierten Felder prüfen.") }
             return
@@ -168,18 +168,39 @@ class ReservationEditViewModel(
 
         private val EMAIL = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 
-        /** Mirrors the validation rules of the TastyIgniter API (`ReservationRequest`). */
-        fun validate(d: ReservationDraft): Map<String, String> = buildMap {
+        /**
+         * Mirrors the validation rules of the TastyIgniter API (`ReservationRequest`).
+         *
+         * Beim Bearbeiten wird weniger verlangt als beim Anlegen, und zwar nicht
+         * aus Nachlaessigkeit: die Telefonannahme hat gar kein Vornamensfeld, ihre
+         * Reservierungen haben also nie einen Vornamen und meist keine E-Mail.
+         * Wuerde das Bearbeiten dieselben Pflichtfelder fordern wie das Anlegen,
+         * liesse sich an einer Telefonbestellung nichts mehr aendern, ohne einen
+         * Vornamen und eine Adresse zu erfinden - genau das ist aufgefallen.
+         *
+         * Neu angelegt wird weiterhin mit Vorname, Nachname und Telefonnummer;
+         * was einmal fehlt, laesst sich nachtraeglich nicht herbeizaubern.
+         */
+        fun validate(d: ReservationDraft, isNew: Boolean = true): Map<String, String> = buildMap {
             if (d.locationId == null) put("location_id", "Bitte einen Standort wählen.")
             if (d.guestNum < 1) put("guest_num", "Mindestens 1 Gast.")
-            if (d.firstName.isBlank()) put("first_name", "Vorname fehlt.")
+
+            if (isNew) {
+                if (d.firstName.isBlank()) put("first_name", "Vorname fehlt.")
+                if (d.lastName.isBlank()) put("last_name", "Nachname fehlt.")
+                if (d.telephone.isBlank()) put("telephone", "Telefonnummer fehlt.")
+            } else if (d.firstName.isBlank() && d.lastName.isBlank()) {
+                // Irgendein Name muss bleiben, sonst steht der Eintrag ohne jeden
+                // Anhaltspunkt da, wer da kommt. Haengt am Nachnamen, damit der
+                // Hinweis nicht zweimal erscheint.
+                put("last_name", "Bitte mindestens Vor- oder Nachname angeben.")
+            }
+
             if (d.firstName.trim().length > 48) put("first_name", "Maximal 48 Zeichen.")
-            if (d.lastName.isBlank()) put("last_name", "Nachname fehlt.")
             if (d.lastName.trim().length > 48) put("last_name", "Maximal 48 Zeichen.")
             // E-mail is optional (not every installation requires it), but must be valid if given.
             if (d.email.isNotBlank() && !EMAIL.matches(d.email.trim())) put("email", "Keine gültige E-Mail-Adresse.")
             if (d.email.trim().length > 96) put("email", "Maximal 96 Zeichen.")
-            if (d.telephone.isBlank()) put("telephone", "Telefonnummer fehlt.")
             if (d.comment.length > 520) put("comment", "Maximal 520 Zeichen.")
         }
     }

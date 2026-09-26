@@ -156,8 +156,14 @@ class TastyIgniterApiTest {
         assertEquals("6", body["status_id"]!!.jsonPrimitive.content)
     }
 
+    /**
+     * Beim Aendern muss die leere Adresse als JSON-null hinausgehen, nicht als
+     * Leerstring: Laravel ueberspringt bei `nullable` nur echtes null, ein ""
+     * laeuft weiter in `email:filter` und faellt durch. Mit Leerstring liess
+     * sich an einer Telefonbestellung ohne Adresse nichts aendern.
+     */
     @Test
-    fun `omits blank email on create but sends it on update`() = runTest {
+    fun `omits blank email on create and clears it with null on update`() = runTest {
         server.enqueue(MockResponse().setResponseCode(201).setBody(MappersTest.SAMPLE_LIST))
         server.enqueue(MockResponse().setBody(MappersTest.SAMPLE_LIST))
         val draft = ReservationDraft(locationId = 1, firstName = "Max", lastName = "Muster", telephone = "0151", email = " ", statusId = 6)
@@ -168,7 +174,7 @@ class TastyIgniterApiTest {
         val created = Json.parseToJsonElement(server.takeRequest().body.readUtf8()) as JsonObject
         assertTrue("email" !in created)
         val updated = Json.parseToJsonElement(server.takeRequest().body.readUtf8()) as JsonObject
-        assertEquals("", updated["email"]!!.jsonPrimitive.content)
+        assertEquals(JsonNull, updated["email"])
         assertTrue("status_id" !in updated)
         // Location default: omitted on create, explicitly cleared on update.
         assertTrue("duration" !in created)
