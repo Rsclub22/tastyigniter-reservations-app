@@ -179,3 +179,5 @@ actual fun melde(titel: String, text: String, kennung: Int): Boolean = runCatchi
     NotificationManagerCompat.from(appContext).notify(kennung, meldung)
     true
 }.getOrDefault(false)
+
+actual val beruehrungKommtAlsMaus: Boolean = false
