@@ -141,3 +141,5 @@ private fun symbolbild(): java.awt.Image {
 
     return bild
 }
+
+actual val beruehrungKommtAlsMaus: Boolean = true

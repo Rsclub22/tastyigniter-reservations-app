@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Notes
@@ -69,6 +67,7 @@ import io.github.rsclub22.tireservations.ui.components.LoadingBox
 import io.github.rsclub22.tireservations.ui.components.LongDateFormat
 import io.github.rsclub22.tireservations.ui.components.StatusBadge
 import io.github.rsclub22.tireservations.ui.components.display
+import io.github.rsclub22.tireservations.ui.components.senkrechtSchiebbar
 import io.github.rsclub22.tireservations.ui.components.statusLabel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -209,7 +208,7 @@ fun ReservationDetailScreen(
                 Modifier
                     .padding(padding)
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
+                    .senkrechtSchiebbar()
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {

@@ -3,8 +3,6 @@ package io.github.rsclub22.tireservations.ui.update
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,6 +23,7 @@ import io.github.rsclub22.tireservations.platform.erneuereSelbst
 import io.github.rsclub22.tireservations.platform.kannSelbstErneuern
 import io.github.rsclub22.tireservations.platform.openUrl
 import io.github.rsclub22.tireservations.ui.components.Meldungen
+import io.github.rsclub22.tireservations.ui.components.senkrechtSchiebbar
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -102,7 +101,7 @@ fun UpdateDialog(
         onDismissRequest = { if (!laeuft) onDismiss() },
         title = { Text("Update verfügbar: ${update.version}") },
         text = {
-            Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
+            Column(Modifier.heightIn(max = 320.dp).senkrechtSchiebbar()) {
                 Text("Installiert ist $installedVersion. " + hinweis(update))
                 if (update.notes.isNotBlank()) {
                     Text(

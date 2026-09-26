@@ -17,10 +17,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -77,6 +75,7 @@ import io.github.rsclub22.tireservations.data.Zeitfenster
 import io.github.rsclub22.tireservations.ui.components.ErrorCard
 import io.github.rsclub22.tireservations.ui.components.LoadingBox
 import io.github.rsclub22.tireservations.ui.components.display
+import io.github.rsclub22.tireservations.ui.components.senkrechtSchiebbar
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -154,7 +153,7 @@ fun TelefonannahmeScreen(
             val breit = maxWidth >= 720.dp
 
             Column(
-                Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),
+                Modifier.fillMaxSize().imePadding().senkrechtSchiebbar().padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 state.fehler?.let { ErrorCard(it, onRetry = vm::neuLaden) }

@@ -75,3 +75,20 @@ expect fun drucke(blatt: Tagesblatt, standort: String, gedrucktAm: String, titel
  *   Aufrufer weicht dann auf eine Meldung in der App aus.
  */
 expect fun melde(titel: String, text: String, kennung: Int): Boolean
+
+/**
+ * Kommen Beruehrungen des Bildschirms als Mausereignisse herein?
+ *
+ * Auf dem Desktop ja, und das ist keine Kleinigkeit: AWT kennt keine
+ * Beruehrungen. X11 - auf dem Tresenrechner XWayland - liefert sie der JVM als
+ * gewoehnliche Mausereignisse, und Compose traegt darum an jedem davon
+ * PointerType.Mouse ein. Compose-Foundation laesst das Ziehen am Inhalt aber
+ * genau fuer diesen Typ nicht zu: eine Maus soll am Rad drehen, nicht den Inhalt
+ * schieben. Ergebnis ohne Gegenmittel: Tippen geht, Wischen tut gar nichts.
+ *
+ * Am Telefon falsch - dort sind es echte Beruehrungen, um die sich Compose
+ * selbst kuemmert.
+ *
+ * Siehe [io.github.rsclub22.tireservations.ui.components.mitFingerSchiebbar].
+ */
+expect val beruehrungKommtAlsMaus: Boolean

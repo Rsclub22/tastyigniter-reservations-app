@@ -3,9 +3,7 @@ package io.github.rsclub22.tireservations.ui.settings
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Logout
@@ -41,6 +39,7 @@ import io.github.rsclub22.tireservations.data.Location
 import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.data.UpdateChecker
+import io.github.rsclub22.tireservations.ui.components.senkrechtSchiebbar
 import io.github.rsclub22.tireservations.ui.update.UpdateDialog
 import kotlinx.coroutines.launch
 
@@ -82,7 +81,7 @@ fun SettingsScreen(
             )
         },
     ) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
+        Column(Modifier.padding(padding).fillMaxSize().senkrechtSchiebbar()) {
             ListItem(
                 headlineContent = { Text(settings.userName ?: settings.email) },
                 supportingContent = { Text(if (settings.isAdmin) "Mitarbeiter · ${settings.email}" else "Kunde · ${settings.email}") },

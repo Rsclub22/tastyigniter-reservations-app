@@ -11,10 +11,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.Visibility
@@ -50,6 +48,7 @@ import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.AppGraph
 import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.ui.components.ErrorCard
+import io.github.rsclub22.tireservations.ui.components.senkrechtSchiebbar
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
@@ -124,7 +123,7 @@ fun LoginScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .imePadding()
-                .verticalScroll(rememberScrollState())
+                .senkrechtSchiebbar()
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),

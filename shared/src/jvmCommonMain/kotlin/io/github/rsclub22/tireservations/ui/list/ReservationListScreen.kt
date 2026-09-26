@@ -2,6 +2,7 @@ package io.github.rsclub22.tireservations.ui.list
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import io.github.rsclub22.tireservations.data.InternReservierung
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.outlined.MarkEmailUnread
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.ExpandLess
 import androidx.compose.material.icons.outlined.Print
+import io.github.rsclub22.tireservations.ui.components.mitFingerSchiebbar
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.material3.rememberDrawerState
@@ -285,12 +288,14 @@ fun ReservationListScreen(
                 onRefresh = vm::refresh,
                 modifier = Modifier.fillMaxSize(),
             ) {
+                val schieber = rememberLazyListState()
                 when {
                     state.loading -> LoadingBox()
                     else -> LazyColumn(
+                        state = schieber,
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().mitFingerSchiebbar(schieber),
                     ) {
                         state.error?.let { msg ->
                             item { ErrorCard(msg, onRetry = vm::refresh) }
@@ -507,9 +512,12 @@ private fun DateBar(date: LocalDate, onPrev: () -> Unit, onNext: () -> Unit, onT
 @Composable
 private fun FilterRow(state: ListState, vm: ReservationListViewModel) {
     var locationMenu by remember { mutableStateOf(false) }
+    val schieber = rememberLazyListState()
     LazyRow(
+        state = schieber,
         contentPadding = PaddingValues(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.mitFingerSchiebbar(schieber, Orientation.Horizontal),
     ) {
         if (state.locations.size > 1) {
             item {

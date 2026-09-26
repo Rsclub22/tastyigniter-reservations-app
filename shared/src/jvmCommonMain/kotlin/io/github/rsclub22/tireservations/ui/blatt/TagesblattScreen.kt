@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -57,6 +55,7 @@ import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.ui.components.ErrorCard
 import io.github.rsclub22.tireservations.ui.components.LoadingBox
 import io.github.rsclub22.tireservations.ui.components.display
+import io.github.rsclub22.tireservations.ui.components.senkrechtSchiebbar
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -150,7 +149,7 @@ fun TagesblattScreen(
         },
     ) { padding ->
         Column(
-            Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp),
+            Modifier.fillMaxSize().padding(padding).senkrechtSchiebbar().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Zeitraumwahl(
