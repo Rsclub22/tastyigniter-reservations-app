@@ -63,9 +63,11 @@ nicht automatisch auf Updates.
 
 ---
 
-## Weg 2: Google Play Store (vorgemerkt)
+## Weg 2: Google Play Store
 
-Noch nicht eingerichtet. Die Schritte, wenn es so weit ist:
+Eingerichtet, der interne Test läuft. Den Upload dorthin erledigt die Pipeline bei jedem
+`v*`-Tag selbst – siehe [Automatischer Upload](#automatischer-upload-in-den-internen-test)
+weiter unten. Die Schritte davor, einmalig:
 
 1. **Entwicklerkonto** unter play.google.com/console anlegen: 25 USD einmalig, Identitätsprüfung.
    Als Organisation zusätzlich eine D-U-N-S-Nummer (kostenlos, dauert Tage bis Wochen).
@@ -88,10 +90,43 @@ Noch nicht eingerichtet. Die Schritte, wenn es so weit ist:
    Test mit mindestens 12 Testern über 14 Tage durchführen (Organisationskonten nicht). Der interne
    Test (bis 100 Tester, sofort) eignet sich zum Ausprobieren.
 7. **Produktion:** Release einreichen; die erste Prüfung dauert meist einige Tage.
-8. **Optional später:** Upload aus der CI automatisieren (Google-Cloud-Dienstkonto als Secret,
-   Upload in den internen Test bei jedem `v*`-Tag).
-
 Google-Richtlinien ändern sich regelmäßig; maßgeblich ist, was die Play Console anzeigt.
+
+### Automatischer Upload in den internen Test
+
+Jeder `v*`-Tag lädt das signierte AAB in den Track **internal** hoch, zusammen mit der
+`mapping.txt` – ohne die sind Abstürze in der Play Console unlesbar, weil der Release-Build
+mit R8 verkleinert wird. Der Schritt in die Produktion bleibt ein bewusster Klick in der
+Play Console; die Pipeline veröffentlicht nichts von sich aus.
+
+Der Upload läuft **nach** dem GitHub-Release. Geht bei Google etwas schief, ist das Release
+trotzdem schon draußen und die Desktop-Fassung kann sich erneuern.
+
+Dafür braucht es einmalig ein Dienstkonto:
+
+1. In der **Play Console** unter *Nutzer und Berechtigungen → Nutzer einladen* bzw.
+   *Einstellungen → API-Zugriff* ein Google-Cloud-Projekt verknüpfen und ein
+   **Dienstkonto** anlegen.
+2. Im **Google Cloud Console** für dieses Dienstkonto einen **JSON-Schlüssel** erzeugen
+   (*Dienstkonten → Schlüssel → Schlüssel hinzufügen → JSON*).
+3. Zurück in der Play Console dem Dienstkonto Zugriff auf **diese App** geben, mit dem
+   Recht *Releases für Testspuren verwalten* (mehr braucht die Pipeline nicht – sie
+   veröffentlicht bewusst nicht in die Produktion).
+4. Den kompletten Inhalt der JSON-Datei als Repository-Secret hinterlegen:
+
+| Secret | Inhalt |
+| --- | --- |
+| `PLAY_SERVICE_ACCOUNT_JSON` | die JSON-Schlüsseldatei des Dienstkontos, vollständig |
+
+Fehlt das Secret, überspringt die Pipeline den Upload mit einem Hinweis im Log und baut
+das GitHub-Release wie gehabt. Dasselbe gilt ohne `ANDROID_KEYSTORE_BASE64`: das AAB wäre
+dann debug-signiert, und Play lehnt so eines ohnehin ab.
+
+> **`versionCode` im Blick behalten.** Er kommt aus der Laufnummer des Workflows
+> (`github.run_number`) und muss für Play streng steigen. Das passt, solange der Workflow
+> `ci.yml` nicht umbenannt oder neu angelegt wird – dann beginnt die Laufnummer wieder bei 1,
+> und Play weist jeden Upload ab, bis sie den höchsten bereits hochgeladenen Wert überholt hat.
+> Stand v0.2.0: Laufnummer 23.
 
 ### Hinweis zur Entwickler-Verifizierung
 
