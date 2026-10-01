@@ -104,15 +104,22 @@ trotzdem schon draußen und die Desktop-Fassung kann sich erneuern.
 
 Dafür braucht es einmalig ein Dienstkonto:
 
-1. In der **Play Console** unter *Nutzer und Berechtigungen → Nutzer einladen* bzw.
-   *Einstellungen → API-Zugriff* ein Google-Cloud-Projekt verknüpfen und ein
-   **Dienstkonto** anlegen.
-2. Im **Google Cloud Console** für dieses Dienstkonto einen **JSON-Schlüssel** erzeugen
-   (*Dienstkonten → Schlüssel → Schlüssel hinzufügen → JSON*).
-3. Zurück in der Play Console dem Dienstkonto Zugriff auf **diese App** geben, mit dem
-   Recht *Releases für Testspuren verwalten* (mehr braucht die Pipeline nicht – sie
-   veröffentlicht bewusst nicht in die Produktion).
-4. Den kompletten Inhalt der JSON-Datei als Repository-Secret hinterlegen:
+Das Dienstkonto entsteht **in der Google Cloud Console**, nicht in der Play Console. Einen
+Menüpunkt *Einstellungen → API-Zugriff* gibt es dort nicht mehr; das Entwicklerkonto muss
+seit der Umstellung auch nicht mehr mit einem Cloud-Projekt verknüpft werden
+([Googles Anleitung](https://developers.google.com/android-publisher/getting_started)).
+
+1. In der **Google Cloud Console** ein Projekt anlegen oder ein vorhandenes nehmen.
+2. Für dieses Projekt die **Google Play Developer API** aktivieren. Wird leicht übersehen –
+   fehlt sie, scheitert der Upload später mit einer nichtssagenden Meldung.
+3. *IAM & Verwaltung → Dienstkonten → **Dienstkonto erstellen***.
+4. Beim angelegten Dienstkonto *Schlüssel → Schlüssel hinzufügen → Neuen Schlüssel
+   erstellen → **JSON***. Diese Datei wandert gleich ins Secret.
+5. In der **Play Console** unter *Nutzer und Berechtigungen → **Neue Nutzer einladen***
+   die **E-Mail-Adresse des Dienstkontos** eintragen und ihr Zugriff auf **diese App**
+   geben, mit dem Recht *Releases für Testspuren verwalten* (mehr braucht die Pipeline
+   nicht – sie veröffentlicht bewusst nicht in die Produktion).
+6. Den kompletten Inhalt der JSON-Datei als Repository-Secret hinterlegen:
 
 | Secret | Inhalt |
 | --- | --- |
