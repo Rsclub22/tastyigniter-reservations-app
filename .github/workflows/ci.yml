@@ -161,3 +161,40 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
+
+      # Google Play, interner Test. Bewusst NACH dem GitHub-Release: schlägt der
+      # Upload fehl - abgelaufenes Dienstkonto, Störung bei Google, abgelehnter
+      # versionCode -, ist das Release trotzdem schon draußen und die
+      # Desktop-Fassung kann sich erneuern.
+      - name: Dienstkonto für Google Play bereitstellen
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::notice::Secret PLAY_SERVICE_ACCOUNT_JSON fehlt – der Upload zu Google Play entfällt."
+            exit 0
+          fi
+          # Ohne echten Keystore ist das AAB mit dem Debug-Schlüssel signiert.
+          # Play lehnt so eins ab; dann soll der Lauf es gar nicht erst
+          # versuchen, statt an Google zu scheitern.
+          if [ -z "$ANDROID_KEYSTORE_FILE" ]; then
+            echo "::warning::Ohne ANDROID_KEYSTORE_BASE64 ist das AAB debug-signiert – kein Upload zu Google Play."
+            exit 0
+          fi
+          echo "PLAY_UPLOAD=ja" >> "$GITHUB_ENV"
+
+      - name: AAB in den internen Test hochladen
+        if: env.PLAY_UPLOAD == 'ja'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: io.github.rsclub22.tireservations
+          releaseFiles: dist/*.aab
+          releaseName: ${{ github.ref_name }}
+          track: internal
+          # Sofort für die internen Tester sichtbar. Der Schritt in die
+          # Produktion bleibt ein bewusster Klick in der Play Console.
+          status: completed
+          # Ohne die Zuordnungsdatei sind Abstürze in der Play Console
+          # unlesbar - der Release-Build läuft mit isMinifyEnabled.
+          mappingFile: app/build/outputs/mapping/release/mapping.txt
