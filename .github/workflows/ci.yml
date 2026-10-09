@@ -191,7 +191,9 @@ jobs:
           packageName: io.github.rsclub22.tireservations
           releaseFiles: dist/*.aab
           releaseName: ${{ github.ref_name }}
-          track: internal
+          # 'track' (Einzahl) ist abgekuendigt und faellt in einer kommenden
+          # Fassung der Action weg; 'tracks' ist der Nachfolger.
+          tracks: internal
           # Sofort für die internen Tester sichtbar. Der Schritt in die
           # Produktion bleibt ein bewusster Klick in der Play Console.
           status: completed
