@@ -58,7 +58,7 @@ class ReservationEditViewModel(
                 val tables = repository.tables()
                 val statuses = repository.statuses()
                 val draft = if (reservationId != null) {
-                    repository.reservation(reservationId).toDraft()
+                    repository.reservation(reservationId).reservation.toDraft()
                 } else {
                     val defaultLocation = settingsStore.settings.first().defaultLocationId
                     _state.value.draft.copy(

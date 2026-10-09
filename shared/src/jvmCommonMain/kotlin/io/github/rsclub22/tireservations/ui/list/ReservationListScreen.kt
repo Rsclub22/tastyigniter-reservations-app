@@ -91,6 +91,7 @@ import io.github.rsclub22.tireservations.ui.components.ErrorCard
 import io.github.rsclub22.tireservations.ui.components.LoadingBox
 import io.github.rsclub22.tireservations.ui.components.LongDateFormat
 import io.github.rsclub22.tireservations.ui.components.StatusBadge
+import io.github.rsclub22.tireservations.ui.components.StatusFehltHinweis
 import io.github.rsclub22.tireservations.ui.components.display
 import io.github.rsclub22.tireservations.ui.components.parseHexColor
 import io.github.rsclub22.tireservations.ui.components.relativeDayLabel
@@ -311,12 +312,7 @@ fun ReservationListScreen(
                         }
                         if (state.statusMissing && state.error == null) {
                             item {
-                                Text(
-                                    "Status konnte nicht geladen werden – bestätigte und ausstehende Reservierungen sind nicht zu unterscheiden.",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.padding(vertical = 4.dp),
-                                )
+                                StatusFehltHinweis()
                             }
                         }
                         if (state.error == null) {

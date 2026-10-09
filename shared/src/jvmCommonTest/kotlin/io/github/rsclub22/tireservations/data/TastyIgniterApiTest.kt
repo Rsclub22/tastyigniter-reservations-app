@@ -240,9 +240,38 @@ class TastyIgniterApiTest {
 
         val r = api().reservation(7)
 
-        assertEquals(7L, r.id)
-        server.takeRequest()
-        assertTrue("status" !in includeOf(server.takeRequest()))
+        assertEquals(7L, r.reservation.id)
+        assertTrue(r.statusMissing)
+        val first = includeOf(server.takeRequest())
+        val second = includeOf(server.takeRequest())
+        assertEquals(listOf("status", "tables", "location"), first)
+        assertTrue("include was $second", "status" !in second)
+        assertTrue("tables" in second)
+        assertTrue("location" in second)
+    }
+
+    @Test
+    fun `single reservation is not flagged when the first request works`() = runTest {
+        server.enqueue(MockResponse().setBody(page(1, 1, reservationJson(7, "2026-09-25"))))
+
+        val r = api().reservation(7)
+
+        assertTrue(!r.statusMissing)
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun `single reservation does not retry on 401`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(401))
+        server.enqueue(MockResponse().setBody(onePage))
+
+        try {
+            api().reservation(7)
+            fail("expected ApiException")
+        } catch (e: ApiException) {
+            assertTrue(e.isUnauthorized)
+        }
+        assertEquals(1, server.requestCount)
     }
 
     @Test

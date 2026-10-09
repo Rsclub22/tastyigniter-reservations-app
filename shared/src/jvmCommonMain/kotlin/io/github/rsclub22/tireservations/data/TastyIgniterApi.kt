@@ -165,13 +165,14 @@ class TastyIgniterApi(
             }
         }
 
-    suspend fun reservation(id: Long): Reservation {
+    suspend fun reservation(id: Long): LoadedReservation {
         val url = url("reservations/$id").newBuilder()
             .addQueryParameter("include", "status,tables,location")
             .build()
-        val doc = document(getWithStatusFallback(url).first)
+        val (body, statusMissing) = getWithStatusFallback(url)
+        val doc = document(body)
         val res = doc.data.firstOrNull() ?: throw ApiException(404, "Reservierung $id nicht gefunden.")
-        return Mappers.reservation(doc, res)
+        return LoadedReservation(Mappers.reservation(doc, res), statusMissing)
     }
 
     suspend fun createReservation(draft: ReservationDraft): Long {

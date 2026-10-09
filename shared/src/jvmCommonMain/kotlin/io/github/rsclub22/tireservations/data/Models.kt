@@ -94,6 +94,9 @@ data class ReservationQuery(
  */
 data class ReservationList(val items: List<Reservation>, val statusMissing: Boolean = false)
 
+/** Eine einzelne Reservierung; [statusMissing] wie bei [ReservationList]. */
+data class LoadedReservation(val reservation: Reservation, val statusMissing: Boolean = false)
+
 class ApiException(
     val statusCode: Int,
     override val message: String,

@@ -113,3 +113,17 @@ fun ErrorCard(message: String, modifier: Modifier = Modifier, onRetry: (() -> Un
         }
     }
 }
+
+/**
+ * Eine Zeile fuer Listen- und Detailansicht, damit beide nie auseinanderlaufen: ohne Status
+ * sieht eine bestaetigte Buchung aus wie eine ausstehende.
+ */
+@Composable
+fun StatusFehltHinweis(modifier: Modifier = Modifier) {
+    Text(
+        "Status konnte nicht geladen werden – bestätigte und ausstehende Reservierungen sind nicht zu unterscheiden.",
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.error,
+        modifier = modifier.padding(vertical = 4.dp),
+    )
+}

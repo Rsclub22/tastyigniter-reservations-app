@@ -3,6 +3,8 @@ package io.github.rsclub22.tireservations.ui.list
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.SettingsStore
+import io.github.rsclub22.tireservations.ui.detail.DetailState
+import io.github.rsclub22.tireservations.ui.detail.ReservationDetailViewModel
 import java.time.LocalDate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -59,13 +61,27 @@ class StatusHinweisTest {
     }
 
     private fun zustandNach(statusIstKaputt: Boolean): ListState {
+        val vm = aufbauen(statusIstKaputt) { repo, einst -> ReservationListViewModel(repo, einst) }
+        return runBlocking {
+            withTimeout(15_000) { vm.state.first { !it.loading && it.reservations.isNotEmpty() } }
+        }
+    }
+
+    private fun detailNach(statusIstKaputt: Boolean): DetailState {
+        val vm = aufbauen(statusIstKaputt) { repo, _ -> ReservationDetailViewModel(repo, 1) }
+        return runBlocking {
+            withTimeout(15_000) { vm.state.first { !it.loading && (it.reservation != null || it.error != null) } }
+        }
+    }
+
+    private fun <T> aufbauen(statusIstKaputt: Boolean, bau: (ReservationRepository, SettingsStore) -> T): T {
         val heute = LocalDate.now()
         server.dispatcher = object : Dispatcher() {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val url = request.requestUrl!!
                 val leer = """{"data":[],"meta":{"pagination":{"current_page":1,"total_pages":1}}}"""
                 return when (url.encodedPath) {
-                    "/api/reservations" -> {
+                    "/api/reservations", "/api/reservations/1" -> {
                         val mitStatus = "status" in url.queryParameter("include")!!.split(',')
                         if (statusIstKaputt && mitStatus) {
                             MockResponse().setResponseCode(500)
@@ -89,10 +105,7 @@ class StatusHinweisTest {
         runBlocking {
             einstellungen.saveLogin(server.url("/api").toString().trimEnd('/'), "a@b.de", true, "tok", null)
         }
-        val vm = ReservationListViewModel(ReservationRepository(einstellungen, OkHttpClient()), einstellungen)
-        return runBlocking {
-            withTimeout(15_000) { vm.state.first { !it.loading && it.reservations.isNotEmpty() } }
-        }
+        return bau(ReservationRepository(einstellungen, OkHttpClient()), einstellungen)
     }
 
     @Test
@@ -109,6 +122,23 @@ class StatusHinweisTest {
         val zustand = zustandNach(statusIstKaputt = false)
 
         assertEquals(1, zustand.reservations.size)
+        assertFalse(zustand.statusMissing)
+    }
+
+    @Test
+    fun `detail flag is set after a fallback`() {
+        val zustand = detailNach(statusIstKaputt = true)
+
+        assertEquals(null, zustand.error)
+        assertEquals(1L, zustand.reservation?.id)
+        assertTrue(zustand.statusMissing)
+    }
+
+    @Test
+    fun `detail flag stays clear when the status loaded`() {
+        val zustand = detailNach(statusIstKaputt = false)
+
+        assertEquals(1L, zustand.reservation?.id)
         assertFalse(zustand.statusMissing)
     }
 }

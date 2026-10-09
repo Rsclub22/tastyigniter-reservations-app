@@ -66,6 +66,7 @@ import io.github.rsclub22.tireservations.ui.components.ErrorCard
 import io.github.rsclub22.tireservations.ui.components.LoadingBox
 import io.github.rsclub22.tireservations.ui.components.LongDateFormat
 import io.github.rsclub22.tireservations.ui.components.StatusBadge
+import io.github.rsclub22.tireservations.ui.components.StatusFehltHinweis
 import io.github.rsclub22.tireservations.ui.components.display
 import io.github.rsclub22.tireservations.ui.components.senkrechtSchiebbar
 import io.github.rsclub22.tireservations.ui.components.statusLabel
@@ -82,6 +83,8 @@ data class DetailState(
     val error: String? = null,
     val message: String? = null,
     val deleted: Boolean = false,
+    /** Die Reservierung kam ohne Statusangabe vom Server (siehe [ReservationList]). */
+    val statusMissing: Boolean = false,
     val unauthorized: Boolean = false,
 )
 
@@ -106,16 +109,17 @@ class ReservationDetailViewModel(
         viewModelScope.launch {
             _state.update { it.copy(loading = it.reservation == null, error = null) }
             runCatching {
-                val r = repository.reservation(id)
+                val loaded = repository.reservation(id)
                 val statuses = repository.statuses()
-                _state.update { it.copy(reservation = r, statuses = statuses, loading = false) }
+                _state.update { it.copy(reservation = loaded.reservation, statusMissing = loaded.statusMissing, statuses = statuses, loading = false) }
             }.onFailure(::fail)
         }
     }
 
     fun changeStatus(statusId: Long, comment: String?, notify: Boolean) = action("Status geändert") {
         repository.updateStatus(id, statusId, comment, notify)
-        _state.update { it.copy(reservation = repository.reservation(id)) }
+        val loaded = repository.reservation(id)
+        _state.update { it.copy(reservation = loaded.reservation, statusMissing = loaded.statusMissing) }
     }
 
     fun delete() = action(null) {
@@ -220,6 +224,7 @@ fun ReservationDetailScreen(
                     )
                     StatusBadge(r.statusName, r.statusColor)
                 }
+                if (state.statusMissing) StatusFehltHinweis()
 
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

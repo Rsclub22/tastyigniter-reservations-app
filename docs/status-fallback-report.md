@@ -32,8 +32,26 @@ echte Kette Viewmodel → Repository → API gegen MockWebServer, echter DataSto
 ## Nicht getestet
 - Die Zeile selbst (Compose) – kein UI-Test; nur Zustand geprüft. Nicht auf einem Gerät angesehen.
 - Echter TastyIgniter-Server mit `status_id = 0`; nur ein nachgestellter 500.
-- Detailansicht zeigt bei Rückfall keinen Hinweis (Flag nur für die Liste verlangt); `statusName` ist dort null.
+- Die Zeile auf einem Gerät ansehen und einen echten Server mit `status_id = 0` ausprobieren: liegt beim Auftraggeber mit dem Restaurant, bewusst nicht von mir.
 
 ## Überraschungen
-- Ein Rückfall bei der Einzelreservierung ist stumm, siehe oben.
 - Der Retry ist auch bei 5xx mit HTML-Antwort (kein JSON) aktiv, weil `send` dort ebenfalls den 5xx-Code trägt.
+
+## Nachtrag: Detailansicht
+- `reservation(id)` liefert `LoadedReservation(reservation, statusMissing)`; `DetailState.statusMissing` wird in
+  `load()` und nach `changeStatus()` gesetzt. Die Bearbeiten-Ansicht nimmt `.reservation` und ignoriert das Flag.
+- Der Text steht nur noch einmal: Composable `StatusFehltHinweis()` in `ui/components/Common.kt`, von Liste
+  und Detail benutzt.
+- Neue Tests: 500→200 am Einzelendpunkt (zweiter Request ohne `status`, mit `tables`/`location`), Flag gesetzt/frei,
+  kein Retry bei 401 und 404; `StatusHinweisTest`: Detail-Viewmodel-Flag gesetzt/frei.
+
+| Bruch | Rot |
+| --- | --- |
+| `status` im Retry behalten | single-retry, detail-flag-set |
+| Retry bei jedem Fehler | single 401, single 404 (+ Listen-Tests) |
+| API verwirft Flag (`false`) | single-retry, detail-flag-set |
+| API meldet immer `true` | single-not-flagged, detail-flag-clear |
+| Detail-Viewmodel ignoriert Flag | detail-flag-set |
+
+Nicht durch Test gedeckt: dass der Detailschirm die Zeile bei gesetztem Flag wirklich zeichnet
+(`if (state.statusMissing) StatusFehltHinweis()` – nur der Zustand ist geprüft, wie bei der Liste).
