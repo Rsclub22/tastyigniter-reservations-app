@@ -88,6 +88,12 @@ data class ReservationQuery(
     val search: String? = null,
 )
 
+/**
+ * Ergebnis einer Listenabfrage. [statusMissing]: mindestens eine Seite musste ohne Status
+ * geholt werden, die Eintraege tragen dann keine verlaesslichen Statusangaben.
+ */
+data class ReservationList(val items: List<Reservation>, val statusMissing: Boolean = false)
+
 class ApiException(
     val statusCode: Int,
     override val message: String,

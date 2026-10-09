@@ -77,13 +77,15 @@ class TastyIgniterApi(
      *
      * @param maxPages only limits search results (no date); day views always cover the whole day.
      */
-    suspend fun reservations(query: ReservationQuery, pageLimit: Int = 100, maxPages: Int = 50): List<Reservation> {
+    suspend fun reservations(query: ReservationQuery, pageLimit: Int = 100, maxPages: Int = 50): ReservationList {
+        var statusMissing = false
         val result = mutableListOf<Reservation>()
         val date = query.date
         if (date == null) {
             var page = 1
             while (page <= maxPages) {
                 val current = reservationPage(query, page, pageLimit)
+                statusMissing = statusMissing || current.statusMissing
                 result += current.items
                 if (page >= current.totalPages || current.items.isEmpty()) break
                 page++
@@ -110,13 +112,15 @@ class TastyIgniterApi(
                 if (oldest == null || oldest < date) break
                 page++
             }
+            statusMissing = pages.values.any { it.statusMissing }
         }
-        return result
+        val items = result
             .filter { date == null || it.date == date }
             .sortedWith(compareBy(nullsLast()) { r: Reservation -> r.date }.thenBy(nullsLast()) { it.time })
+        return ReservationList(items, statusMissing)
     }
 
-    private class ReservationPage(val items: List<Reservation>, val totalPages: Int) {
+    private class ReservationPage(val items: List<Reservation>, val totalPages: Int, val statusMissing: Boolean) {
         val oldestDate: LocalDate? = items.mapNotNull { it.date }.minOrNull()
     }
 
@@ -132,15 +136,40 @@ class TastyIgniterApi(
                 query.search?.takeIf { it.isNotBlank() }?.let { addQueryParameter("search", it.trim()) }
             }
             .build()
-        val doc = document(send("GET", url))
-        return ReservationPage(doc.data.map { Mappers.reservation(doc, it) }, doc.totalPages)
+        val (body, statusMissing) = getWithStatusFallback(url)
+        val doc = document(body)
+        return ReservationPage(doc.data.map { Mappers.reservation(doc, it) }, doc.totalPages, statusMissing)
     }
+
+    /**
+     * Fragt mit `include=status,...` an. Antwortet der Server mit 5xx, wird genau einmal ohne
+     * `status` wiederholt: TastyIgniter legt Reservierungen ohne Status mit `status_id = 0` an,
+     * und sein StatusTransformer stolpert darueber - eine einzige solche Reservierung liesse
+     * sonst die ganze Liste scheitern. Nur 5xx: ein 401 oder 422 darf nicht hinter einer halb
+     * funktionierenden Ansicht verschwinden. Scheitert auch die Wiederholung, gilt der erste Fehler.
+     *
+     * @return die Antwort und ob sie ohne Status geholt wurde.
+     */
+    private suspend fun getWithStatusFallback(url: HttpUrl): Pair<JsonElement?, Boolean> =
+        try {
+            send("GET", url) to false
+        } catch (first: ApiException) {
+            if (first.statusCode !in 500..599) throw first
+            val include = url.queryParameter("include").orEmpty()
+                .split(',').filter { it != "status" }.joinToString(",")
+            val retry = url.newBuilder().setQueryParameter("include", include).build()
+            try {
+                send("GET", retry) to true
+            } catch (_: ApiException) {
+                throw first
+            }
+        }
 
     suspend fun reservation(id: Long): Reservation {
         val url = url("reservations/$id").newBuilder()
             .addQueryParameter("include", "status,tables,location")
             .build()
-        val doc = document(send("GET", url))
+        val doc = document(getWithStatusFallback(url).first)
         val res = doc.data.firstOrNull() ?: throw ApiException(404, "Reservierung $id nicht gefunden.")
         return Mappers.reservation(doc, res)
     }

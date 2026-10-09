@@ -49,6 +49,11 @@ Verwendete Endpunkte:
 > Hinweis: Pflichtfelder beim Anlegen sind **Vorname, Nachname und Telefon**. Die E-Mail-Adresse ist
 > optional und wird ohne Eingabe gar nicht erst mitgeschickt. Verlangt eine Installation sie doch, zeigt
 > die App die Fehlermeldung des Servers am Feld an.
+>
+> Hinweis: Die Reservierungsliste wird mit `include=status,tables,location` geholt. Antwortet der Server
+> darauf mit einem 5xx-Fehler (TastyIgniter scheitert an Reservierungen mit `status_id = 0`), versucht die
+> App es genau einmal ohne `status` erneut und zeigt über der Liste: „Status konnte nicht geladen werden“.
+> Andere Fehler (z. B. 401, 422) werden nicht wiederholt. Scheitert auch der zweite Versuch, gilt der erste Fehler.
 
 ## Installation
 

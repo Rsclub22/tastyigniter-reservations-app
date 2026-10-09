@@ -38,6 +38,8 @@ data class ListState(
     val loading: Boolean = true,
     val refreshing: Boolean = false,
     val error: String? = null,
+    /** Die Liste kam ohne Statusangaben: Bestaetigt und Ausstehend sind nicht zu unterscheiden. */
+    val statusMissing: Boolean = false,
     val unauthorized: Boolean = false,
     /**
      * Unbestaetigte Reservierungen - die ueber das oeffentliche Formular. Sie
@@ -185,8 +187,8 @@ class ReservationListViewModel(
                 search = s.search.takeIf { s.isSearching },
             )
             try {
-                val list = repository.reservations(query)
-                _state.update { it.copy(reservations = list, loading = false, refreshing = false, error = null) }
+                val result = repository.reservations(query)
+                _state.update { it.copy(reservations = result.items, statusMissing = result.statusMissing, loading = false, refreshing = false, error = null) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

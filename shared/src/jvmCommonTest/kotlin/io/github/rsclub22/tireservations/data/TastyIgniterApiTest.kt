@@ -70,7 +70,7 @@ class TastyIgniterApiTest {
             ReservationQuery(date = null, locationId = 1, statusId = 6),
         )
 
-        assertEquals(1, list.size)
+        assertEquals(1, list.items.size)
         val first = server.takeRequest()
         assertEquals("Bearer secret", first.getHeader("Authorization"))
         val url = first.requestUrl!!
@@ -103,7 +103,7 @@ class TastyIgniterApiTest {
 
         val list = api().reservations(ReservationQuery(date = LocalDate.of(2026, 9, 25)))
 
-        assertEquals(listOf(4L, 3L, 2L), list.map { it.id })
+        assertEquals(listOf(4L, 3L, 2L), list.items.map { it.id })
         val first = server.takeRequest().requestUrl!!
         assertEquals("reserve_date desc", first.queryParameter("sort"))
         // The server-side dateTimeFilter is broken in TastyIgniter and must not be sent.
@@ -128,8 +128,135 @@ class TastyIgniterApiTest {
         val target = newest.minusDays(300)
         val list = api().reservations(ReservationQuery(date = target))
 
-        assertEquals(listOf(3011L, 3010L), list.map { it.id })
+        assertEquals(listOf(3011L, 3010L), list.items.map { it.id })
         assertTrue("requests: ${server.requestCount}", server.requestCount <= 12)
+    }
+
+    // --- Rueckfall ohne Status ------------------------------------------------------------
+
+    private fun includeOf(request: RecordedRequest) =
+        request.requestUrl!!.queryParameter("include")!!.split(',')
+
+    private val onePage = page(1, 1, reservationJson(1, "2026-09-25"))
+
+    @Test
+    fun `retries without status after a 5xx and reports it`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(500).setBody("""{"message":"boom"}"""))
+        server.enqueue(MockResponse().setBody(onePage))
+
+        val list = api().reservations(ReservationQuery(date = null))
+
+        assertEquals(listOf(1L), list.items.map { it.id })
+        assertTrue(list.statusMissing)
+        assertEquals(2, server.requestCount)
+        val first = server.takeRequest()
+        val second = server.takeRequest()
+        assertEquals(listOf("status", "tables", "location"), includeOf(first))
+        val include = includeOf(second)
+        assertTrue("include was $include", "status" !in include)
+        assertTrue("tables" in include)
+        assertTrue("location" in include)
+        // Everything else about the request stays the same.
+        assertEquals(first.requestUrl!!.queryParameter("page"), second.requestUrl!!.queryParameter("page"))
+        assertEquals("reserve_date desc", second.requestUrl!!.queryParameter("sort"))
+    }
+
+    @Test
+    fun `surfaces the original error when the retry fails too and does not loop`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(500).setBody("""{"message":"erster Fehler"}"""))
+        server.enqueue(MockResponse().setResponseCode(503).setBody("""{"message":"zweiter Fehler"}"""))
+        server.enqueue(MockResponse().setBody(onePage)) // must never be fetched
+
+        try {
+            api().reservations(ReservationQuery(date = null))
+            fail("expected ApiException")
+        } catch (e: ApiException) {
+            assertEquals(500, e.statusCode)
+            assertEquals("erster Fehler", e.message)
+        }
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun `does not retry on 401`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(401).setBody("""{"message":"Unauthenticated."}"""))
+        server.enqueue(MockResponse().setBody(onePage))
+
+        try {
+            api().reservations(ReservationQuery(date = null))
+            fail("expected ApiException")
+        } catch (e: ApiException) {
+            assertTrue(e.isUnauthorized)
+        }
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun `does not retry on 422`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(422).setBody("""{"message":"ungueltig"}"""))
+        server.enqueue(MockResponse().setBody(onePage))
+
+        try {
+            api().reservations(ReservationQuery(date = null))
+            fail("expected ApiException")
+        } catch (e: ApiException) {
+            assertEquals(422, e.statusCode)
+        }
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun `a successful request is sent once with the full include and is not flagged`() = runTest {
+        server.enqueue(MockResponse().setBody(onePage))
+
+        val list = api().reservations(ReservationQuery(date = null))
+
+        assertTrue(!list.statusMissing)
+        assertEquals(1, server.requestCount)
+        assertEquals(listOf("status", "tables", "location"), includeOf(server.takeRequest()))
+    }
+
+    @Test
+    fun `one fallen back page flags the whole multi page load`() = runTest {
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val p = request.requestUrl!!.queryParameter("page")!!.toInt()
+                val withStatus = "status" in includeOf(request)
+                return if (p == 2 && withStatus) MockResponse().setResponseCode(500)
+                else MockResponse().setBody(page(p, 2, reservationJson(p, "2026-09-25")))
+            }
+        }
+
+        val list = api().reservations(ReservationQuery(date = null))
+
+        assertEquals(listOf(1L, 2L), list.items.map { it.id })
+        assertTrue(list.statusMissing)
+    }
+
+    @Test
+    fun `single reservation also retries without status on 5xx`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(500))
+        server.enqueue(MockResponse().setBody(page(1, 1, reservationJson(7, "2026-09-25"))))
+
+        val r = api().reservation(7)
+
+        assertEquals(7L, r.id)
+        server.takeRequest()
+        assertTrue("status" !in includeOf(server.takeRequest()))
+    }
+
+    @Test
+    fun `single reservation does not retry on 404`() = runTest {
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(MockResponse().setBody(onePage))
+
+        try {
+            api().reservation(7)
+            fail("expected ApiException")
+        } catch (e: ApiException) {
+            assertEquals(404, e.statusCode)
+        }
+        assertEquals(1, server.requestCount)
     }
 
     @Test

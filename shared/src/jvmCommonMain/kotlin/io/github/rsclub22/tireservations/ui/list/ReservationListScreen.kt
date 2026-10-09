@@ -309,6 +309,16 @@ fun ReservationListScreen(
                                 )
                             }
                         }
+                        if (state.statusMissing && state.error == null) {
+                            item {
+                                Text(
+                                    "Status konnte nicht geladen werden – bestätigte und ausstehende Reservierungen sind nicht zu unterscheiden.",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.padding(vertical = 4.dp),
+                                )
+                            }
+                        }
                         if (state.error == null) {
                             item {
                                 Text(
