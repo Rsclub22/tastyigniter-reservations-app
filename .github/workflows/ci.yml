@@ -198,8 +198,20 @@ jobs:
           done < "$RUNNER_TEMP/aenderungen.txt"
           printf '%s\n' "$NOTIZ" > "$RUNNER_TEMP/whatsnew/whatsnew-de"
 
-          echo "## Änderungen" > "$RUNNER_TEMP/release-notes.md"
-          cat "$RUNNER_TEMP/aenderungen.txt" >> "$RUNNER_TEMP/release-notes.md"
+          # Das GitHub-Release bekommt dieselbe Liste wie Play - und sonst
+          # nichts: die App zeigt den Text des Releases als "Neuerungen" im
+          # Update-Dialog, und dort haben Pull-Request-Links und
+          # Dependabot-Betreffe nichts verloren. Der Vergleichslink darunter
+          # gilt dem, der auf GitHub nachsehen will.
+          VORHER=$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          {
+            echo "## Änderungen"
+            cat "$RUNNER_TEMP/aenderungen.txt"
+            if [ -n "$VORHER" ]; then
+              printf '\n**Alle Commits**: https://github.com/%s/compare/%s...%s\n' \
+                "$GITHUB_REPOSITORY" "$VORHER" "$GITHUB_REF_NAME"
+            fi
+          } > "$RUNNER_TEMP/release-notes.md"
           cat "$RUNNER_TEMP/whatsnew/whatsnew-de"
 
       - name: GitHub-Release erstellen
@@ -207,7 +219,8 @@ jobs:
         with:
           files: dist/*
           body_path: ${{ runner.temp }}/release-notes.md
-          generate_release_notes: true
+          # Keine automatischen Notizen: siehe Aenderungsliste oben.
+          generate_release_notes: false
 
       # Google Play, interner Test. Bewusst NACH dem GitHub-Release: schlägt der
       # Upload fehl - abgelaufenes Dienstkonto, Störung bei Google, abgelehnter
