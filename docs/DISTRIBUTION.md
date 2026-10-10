@@ -92,12 +92,25 @@ weiter unten. Die Schritte davor, einmalig:
 7. **Produktion:** Release einreichen; die erste Prüfung dauert meist einige Tage.
 Google-Richtlinien ändern sich regelmäßig; maßgeblich ist, was die Play Console anzeigt.
 
-### Automatischer Upload in den internen Test
+### Automatischer Upload in den internen und den geschlossenen Test
 
-Jeder `v*`-Tag lädt das signierte AAB in den Track **internal** hoch, zusammen mit der
-`mapping.txt` – ohne die sind Abstürze in der Play Console unlesbar, weil der Release-Build
-mit R8 verkleinert wird. Der Schritt in die Produktion bleibt ein bewusster Klick in der
-Play Console; die Pipeline veröffentlicht nichts von sich aus.
+Jeder `v*`-Tag lädt das signierte AAB in die Tracks **internal** und **alpha** (geschlossener
+Test) hoch, zusammen mit der `mapping.txt` – ohne die sind Abstürze in der Play Console
+unlesbar, weil der Release-Build mit R8 verkleinert wird. Im geschlossenen Test erscheint die
+Fassung erst nach der Prüfung durch Google. Der Schritt in die Produktion bleibt ein bewusster
+Klick in der Play Console; die Pipeline veröffentlicht nichts von sich aus.
+
+Die **Neuerungen** (Release Notes, Sprache `de` wie in der Play Console) stammen aus der Nachricht des Tags:
+
+```bash
+git tag -a v0.3.0 -m "- Wartezeiten stehen in der Liste
+- Fehler beim Speichern behoben"
+```
+
+Jede Zeile wird ein Punkt der Liste. Ohne Nachricht (leichtgewichtiger Tag) nimmt die Pipeline
+die Commit-Betreffe seit dem vorigen Tag – die sind ohne Umlaute und nennen auch Interna, daher
+besser den Tag annotieren. Play erlaubt 500 Zeichen; was darüber hinausgeht, wird zeilenweise
+abgeschnitten. Dieselbe Liste steht auch im GitHub-Release.
 
 Der Upload läuft **nach** dem GitHub-Release. Geht bei Google etwas schief, ist das Release
 trotzdem schon draußen und die Desktop-Fassung kann sich erneuern.

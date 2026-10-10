@@ -122,8 +122,9 @@ noch die Android-Anwendungshülle darum.
   Desktop-Paket. APK, `.deb` und Berichte werden als Artefakte hochgeladen.
 - **Tag `v*`** (z. B. `v1.0.0`): signiertes Release-APK, -AAB und das `.deb` bauen und als
   GitHub-Release veröffentlichen. `versionName` kommt aus dem Tag, `versionCode` aus der
-  Laufnummer. Anschließend geht das AAB in den **internen Test bei Google Play** – nur
-  dorthin, der Schritt in die Produktion bleibt ein Klick in der Play Console. Ohne das
+  Laufnummer. Anschließend geht das AAB in den **internen und den geschlossenen Test bei
+  Google Play** – nur dorthin, der Schritt in die Produktion bleibt ein Klick in der Play
+  Console. Die Neuerungen kommen aus der Nachricht des annotierten Tags. Ohne das
   Secret `PLAY_SERVICE_ACCOUNT_JSON` entfällt der Upload, siehe
   [docs/DISTRIBUTION.md](docs/DISTRIBUTION.md).
 
