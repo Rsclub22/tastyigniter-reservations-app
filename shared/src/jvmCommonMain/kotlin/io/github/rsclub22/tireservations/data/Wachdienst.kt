@@ -35,7 +35,7 @@ class Wachdienst(
 
     suspend fun nachsehen(): Ergebnis? {
         val einstellungen = settingsStore.settings.first()
-        if (!einstellungen.isLoggedIn) return null
+        if (!zustaendig(einstellungen)) return null
 
         val merker = einstellungen.letzteGesehene
         val offen = runCatching { repository.internOffen(merker) }.getOrNull() ?: return null
@@ -65,6 +65,14 @@ class Wachdienst(
     )
 
     internal companion object {
+
+        /**
+         * Nur angemeldete Mitarbeiter. Ein Kunden-Token darf /intern/offen nicht
+         * abfragen - der Server antwortet mit 403, und ohne diese Pruefung liefe
+         * der Wachposten am Telefon des Gastes alle paar Minuten ins Leere.
+         */
+        internal fun zustaendig(einstellungen: AppSettings): Boolean =
+            einstellungen.isLoggedIn && einstellungen.isAdmin
 
         internal fun entscheide(merker: Long, offen: OffeneReservierungen): Entscheidung {
             // Erster Lauf: nur den Merker setzen. Sonst kuendigt die App beim ersten

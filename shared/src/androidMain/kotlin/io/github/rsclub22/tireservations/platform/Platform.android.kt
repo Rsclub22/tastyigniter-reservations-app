@@ -11,12 +11,15 @@ import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.provider.CalendarContract
 import android.print.PrintAttributes
 import android.print.PrintManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.core.app.NotificationCompat
 import io.github.rsclub22.tireservations.data.Druckblatt
+import io.github.rsclub22.tireservations.data.Kalender
+import io.github.rsclub22.tireservations.data.Kalendereintrag
 import io.github.rsclub22.tireservations.data.Tagesblatt
 import androidx.core.app.NotificationManagerCompat
 import java.io.File
@@ -85,6 +88,23 @@ actual fun composeMail(address: String, subject: String): Boolean = start(
 
 actual fun openUrl(url: String): Boolean =
     start(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+
+/**
+ * ACTION_INSERT statt des Google-Links: so oeffnet sich die Kalender-App mit dem
+ * vorbelegten Eintrag, und der Gast tippt nur noch auf Speichern. Der Link
+ * landete am Telefon je nach Einstellung im Browser mit Google-Anmeldung.
+ * Fehlt eine Kalender-App, bleibt der Link als Ausweg.
+ */
+actual fun trageInKalenderEin(eintrag: Kalendereintrag): Boolean {
+    val intent = Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI).apply {
+        putExtra(CalendarContract.Events.TITLE, eintrag.titel)
+        putExtra(CalendarContract.Events.DESCRIPTION, eintrag.details)
+        eintrag.ort?.let { putExtra(CalendarContract.Events.EVENT_LOCATION, it) }
+        putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, eintrag.beginnMillis)
+        putExtra(CalendarContract.EXTRA_EVENT_END_TIME, eintrag.endeMillis)
+    }
+    return start(intent) || openUrl(Kalender.googleLink(eintrag))
+}
 
 private fun start(intent: Intent): Boolean = try {
     // FLAG_ACTIVITY_NEW_TASK ist Pflicht, weil hier der Anwendungskontext startet und

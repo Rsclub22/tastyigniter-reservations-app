@@ -37,6 +37,8 @@ private val GERMAN = Locale.GERMANY
 val TimeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm", GERMAN)
 val LongDateFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE, d. MMMM yyyy", GERMAN)
 val ShortDateFormat: DateTimeFormatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(GERMAN)
+/** Fuer die schmale Zeitspalte der Karten: "11.10.26" - das volle Jahr wird dort abgeschnitten. */
+val KnappesDatum: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yy", GERMAN)
 
 fun LocalTime?.display(): String = this?.format(TimeFormat) ?: "--:--"
 fun LocalDate?.display(): String = this?.format(ShortDateFormat) ?: "–"

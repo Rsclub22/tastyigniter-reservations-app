@@ -68,7 +68,7 @@ class StatusHinweisTest {
     }
 
     private fun detailNach(statusIstKaputt: Boolean): DetailState {
-        val vm = aufbauen(statusIstKaputt) { repo, _ -> ReservationDetailViewModel(repo, 1) }
+        val vm = aufbauen(statusIstKaputt) { repo, einst -> ReservationDetailViewModel(repo, einst, 1) }
         return runBlocking {
             withTimeout(15_000) { vm.state.first { !it.loading && (it.reservation != null || it.error != null) } }
         }

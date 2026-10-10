@@ -77,7 +77,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -89,6 +91,7 @@ import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.ui.components.ErrorCard
 import io.github.rsclub22.tireservations.ui.components.LoadingBox
+import io.github.rsclub22.tireservations.ui.components.KnappesDatum
 import io.github.rsclub22.tireservations.ui.components.LongDateFormat
 import io.github.rsclub22.tireservations.ui.components.StatusBadge
 import io.github.rsclub22.tireservations.ui.components.StatusFehltHinweis
@@ -100,7 +103,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun ReservationListScreen(
     repository: ReservationRepository,
@@ -122,6 +125,9 @@ fun ReservationListScreen(
     // Returning from detail/edit screens re-enters composition: refresh the list then.
     LaunchedEffect(Unit) { vm.onScreenShown() }
     LaunchedEffect(state.unauthorized) { if (state.unauthorized) onUnauthorized() }
+    // Zurueck bei offenem Menue schliesst das Menue. Ohne das beendet die Taste am
+    // Telefon die App, weil die Tagesliste das Ende des Navigationsstapels ist.
+    BackHandler(enabled = schublade.isOpen) { bereich.launch { schublade.close() } }
 
     ModalNavigationDrawer(
         drawerState = schublade,
@@ -134,42 +140,46 @@ fun ReservationListScreen(
                     style = MaterialTheme.typography.titleMedium,
                 )
                 NavigationDrawerItem(
-                    label = { Text("Tagesliste") },
+                    label = { Text(if (state.kundenansicht) "Meine Reservierungen" else "Tagesliste") },
                     icon = { Icon(Icons.Outlined.Event, contentDescription = null) },
                     selected = true,
                     onClick = { bereich.launch { schublade.close() } },
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
-                NavigationDrawerItem(
-                    label = { Text("Telefonannahme") },
-                    icon = { Icon(Icons.AutoMirrored.Outlined.PhoneForwarded, contentDescription = null) },
-                    selected = false,
-                    onClick = {
-                        bereich.launch { schublade.close() }
-                        onAnnahme()
-                    },
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
-                NavigationDrawerItem(
-                    label = { Text("Monatsübersicht") },
-                    icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
-                    selected = false,
-                    onClick = {
-                        bereich.launch { schublade.close() }
-                        onMonat()
-                    },
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
-                NavigationDrawerItem(
-                    label = { Text("Tagesblatt drucken") },
-                    icon = { Icon(Icons.Outlined.Print, contentDescription = null) },
-                    selected = false,
-                    onClick = {
-                        bereich.launch { schublade.close() }
-                        onBlatt()
-                    },
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
+                // Telefonannahme, Monat und Tagesblatt sind Intern-Endpunkte; ein
+                // Kunden-Token bekommt dort nur 403.
+                if (!state.kundenansicht) {
+                    NavigationDrawerItem(
+                        label = { Text("Telefonannahme") },
+                        icon = { Icon(Icons.AutoMirrored.Outlined.PhoneForwarded, contentDescription = null) },
+                        selected = false,
+                        onClick = {
+                            bereich.launch { schublade.close() }
+                            onAnnahme()
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text("Monatsübersicht") },
+                        icon = { Icon(Icons.Outlined.CalendarMonth, contentDescription = null) },
+                        selected = false,
+                        onClick = {
+                            bereich.launch { schublade.close() }
+                            onMonat()
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text("Tagesblatt drucken") },
+                        icon = { Icon(Icons.Outlined.Print, contentDescription = null) },
+                        selected = false,
+                        onClick = {
+                            bereich.launch { schublade.close() }
+                            onBlatt()
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                }
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 NavigationDrawerItem(
                     label = { Text("Einstellungen") },
@@ -216,7 +226,7 @@ fun ReservationListScreen(
                 )
             } else {
                 TopAppBar(
-                    title = { Text("Reservierungen") },
+                    title = { Text(if (state.kundenansicht) "Meine Reservierungen" else "Reservierungen") },
                     navigationIcon = {
                         IconButton(onClick = { bereich.launch { schublade.open() } }) {
                             Icon(Icons.Filled.Menu, contentDescription = "Menü")
@@ -226,11 +236,13 @@ fun ReservationListScreen(
                         IconButton(onClick = { vm.setSearchActive(true) }) {
                             Icon(Icons.Outlined.Search, contentDescription = "Suchen")
                         }
-                        IconButton(onClick = onAnnahme) {
-                            Icon(
-                                Icons.AutoMirrored.Outlined.PhoneForwarded,
-                                contentDescription = "Telefonannahme",
-                            )
+                        if (!state.kundenansicht) {
+                            IconButton(onClick = onAnnahme) {
+                                Icon(
+                                    Icons.AutoMirrored.Outlined.PhoneForwarded,
+                                    contentDescription = "Telefonannahme",
+                                )
+                            }
                         }
                         IconButton(onClick = onSettings) {
                             Icon(Icons.Outlined.Settings, contentDescription = "Einstellungen")
@@ -240,10 +252,12 @@ fun ReservationListScreen(
             }
         },
         floatingActionButton = {
+            // Gaeste buchen ueber die Webseite: nur dort gelten Sperrtage und
+            // Kuechenschluss, die API prueft sie nicht.
             // Zwei Wege hinter einem Knopf: am Telefon zaehlt Tempo, beim Nacharbeiten
             // die Vollstaendigkeit. Das Menue oeffnet sich ueber dem Knopf, damit der
             // Daumen nicht wandern muss.
-            Box {
+            if (!state.kundenansicht) Box {
                 DropdownMenu(expanded = plusMenue, onDismissRequest = { plusMenue = false }) {
                     DropdownMenuItem(
                         text = { Text("Schnelle Annahme") },
@@ -273,7 +287,9 @@ fun ReservationListScreen(
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            if (!state.isSearching) {
+            // Der Gast hat eine Handvoll Reservierungen: alle auf einmal, mit Datum,
+            // statt Tag fuer Tag zu blaettern.
+            if (!state.isSearching && !state.kundenansicht) {
                 DateBar(
                     date = state.date,
                     onPrev = { vm.shiftDate(-1) },
@@ -332,7 +348,7 @@ fun ReservationListScreen(
                             if (state.istVermerk(r)) {
                                 VermerkBand(r, onClick = { onOpen(r.id) })
                             } else {
-                                ReservationCard(r, showDate = state.isSearching, onClick = { onOpen(r.id) })
+                                ReservationCard(r, showDate = state.isSearching || state.kundenansicht, onClick = { onOpen(r.id) })
                             }
                         }
                     }
@@ -572,7 +588,7 @@ private fun ReservationCard(r: Reservation, showDate: Boolean, onClick: () -> Un
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(56.dp)) {
                 Text(r.time.display(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 if (showDate) {
-                    Text(r.date.display(), style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                    Text(r.date?.format(KnappesDatum) ?: "–", style = MaterialTheme.typography.labelSmall, maxLines = 1)
                 }
             }
             Spacer(Modifier.width(12.dp))

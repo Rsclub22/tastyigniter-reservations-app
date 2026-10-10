@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -23,6 +24,7 @@ class MappersTest {
         assertEquals(12L, r.id)
         assertEquals(1L, r.locationId)
         assertEquals("Hauptstraße", r.locationName)
+        assertEquals("Hauptstraße 7, 12345 Musterstadt", r.locationAddress)
         assertEquals(4, r.guestNum)
         assertEquals("Erika Mustermann", r.customerName)
         assertEquals(LocalDate.of(2026, 9, 25), r.date)
@@ -35,6 +37,35 @@ class MappersTest {
         assertEquals("T3, T4", r.tableNames)
         assertEquals(2, d.currentPage)
         assertEquals(3, d.totalPages)
+    }
+
+    @Test
+    fun `location without address fields has no address`() {
+        val ohneAdresse = SAMPLE_LIST.replace(
+            ", \"location_address_1\": \"Hauptstraße 7\", \"location_address_2\": null, \"location_postcode\": \"12345\", \"location_city\": \"Musterstadt\"",
+            "",
+        )
+        val d = doc(ohneAdresse)
+        val r = Mappers.reservation(d, d.data.first(), berlin)
+        assertEquals("Hauptstraße", r.locationName)
+        assertEquals(null, r.locationAddress)
+    }
+
+    @Test
+    fun `Datum und Beginn stimmen auch auf einem Geraet in New York`() {
+        val d = doc(SAMPLE_LIST)
+        val r = Mappers.reservation(d, d.data.first(), ZoneId.of("America/New_York"))
+        // reserve_date (UTC-Mitternacht) ergaebe dort den 24.; reserve_datetime zaehlt.
+        assertEquals(LocalDate.of(2026, 9, 25), r.date)
+        assertEquals(LocalTime.of(19, 30), r.time)
+        assertEquals(Instant.parse("2026-09-25T17:30:00Z"), r.beginn)
+    }
+
+    @Test
+    fun `ohne reserve_datetime bleibt der alte Weg ueber reserve_date`() {
+        val d = doc(SAMPLE_LIST.replace("\"reserve_datetime\": \"2026-09-25 19:30:00\", ", ""))
+        val r = Mappers.reservation(d, d.data.first(), berlin)
+        assertEquals(LocalDate.of(2026, 9, 25), r.date)
     }
 
     @Test
@@ -74,6 +105,7 @@ class MappersTest {
               "first_name": "Erika", "last_name": "Mustermann", "email": "erika@example.com",
               "telephone": "+49 30 123456", "comment": "Fensterplatz",
               "reserve_date": "2026-09-24T22:00:00.000000Z", "reserve_time": "19:30:00",
+              "reserve_datetime": "2026-09-25 19:30:00", "reservation_datetime": "2026-09-25T17:30:00.000000Z",
               "duration": 90, "status_id": 6, "table_name": null,
               "created_at": "2026-09-20T10:00:00.000000Z"
             },
@@ -87,7 +119,7 @@ class MappersTest {
             {"type": "statuses", "id": "6", "attributes": {"status_name": "Confirmed", "status_color": "#00a65a", "status_for": "reservation"}},
             {"type": "tables", "id": "3", "attributes": {"id": 3, "name": "T3", "min_capacity": 2, "max_capacity": 4}},
             {"type": "tables", "id": "4", "attributes": {"id": 4, "name": "T4", "min_capacity": 2, "max_capacity": 6}},
-            {"type": "locations", "id": "1", "attributes": {"location_name": "Hauptstraße"}}
+            {"type": "locations", "id": "1", "attributes": {"location_name": "Hauptstraße", "location_address_1": "Hauptstraße 7", "location_address_2": null, "location_postcode": "12345", "location_city": "Musterstadt"}}
           ],
           "meta": {"pagination": {"total": 45, "count": 20, "per_page": 20, "current_page": 2, "total_pages": 3}}
         }

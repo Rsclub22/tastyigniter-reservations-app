@@ -95,18 +95,26 @@ object Mappers {
         val location = doc.related(res, "location").firstOrNull()
         val tables = doc.related(res, "tables").map { table(it) }
         val dateTime = parseDateTime(a.string("reservation_datetime"), zone)
+        // reserve_date kommt als UTC-Mitternacht des Servers und waere, in die Zone
+        // des Geraets umgerechnet, westlich von Europa einen Tag zu frueh.
+        // reserve_datetime ("2026-10-11 19:00:00") ist die Wanduhr des Restaurants
+        // ohne Zone und deshalb die verlaessliche Quelle.
+        val wanduhr = a.string("reserve_datetime")?.takeIf { it.length >= 10 }
         return Reservation(
             id = a.long("reservation_id") ?: res.id.toLongOrNull() ?: a.long("id") ?: 0,
             locationId = a.long("location_id"),
             locationName = location?.attributes?.string("location_name"),
+            locationAddress = location?.attributes?.let(::anschrift),
             guestNum = a.int("guest_num") ?: 0,
             firstName = a.string("first_name").orEmpty(),
             lastName = a.string("last_name").orEmpty(),
             email = a.string("email").orEmpty(),
             telephone = a.string("telephone").orEmpty(),
             comment = a.string("comment").orEmpty(),
-            date = parseDate(a.string("reserve_date"), zone) ?: dateTime?.first,
+            date = wanduhr?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() }
+                ?: parseDate(a.string("reserve_date"), zone) ?: dateTime?.first,
             time = parseTime(a.string("reserve_time")) ?: dateTime?.second,
+            beginn = parseInstant(a.string("reservation_datetime")),
             duration = a.int("duration")?.takeIf { it > 0 },
             statusId = a.long("status_id")?.takeIf { it > 0 } ?: status?.id,
             statusName = status?.name ?: a.string("status_name"),
@@ -116,6 +124,15 @@ object Mappers {
                 ?: tables.takeIf { it.isNotEmpty() }?.joinToString { it.name },
             createdAt = a.string("created_at") ?: a.string("date_added"),
         )
+    }
+
+    /** "Straße 1, 12345 Ort" aus den Einzelfeldern; null, wenn der Standort keine Anschrift traegt. */
+    private fun anschrift(a: JsonObject): String? {
+        val strasse = listOfNotNull(a.string("location_address_1"), a.string("location_address_2"))
+            .map(String::trim).filter(String::isNotEmpty).joinToString(", ")
+        val ort = listOfNotNull(a.string("location_postcode"), a.string("location_city"))
+            .map(String::trim).filter(String::isNotEmpty).joinToString(" ")
+        return listOf(strasse, ort).filter(String::isNotEmpty).joinToString(", ").ifEmpty { null }
     }
 
     fun location(res: Resource) = Location(
@@ -149,6 +166,13 @@ object Mappers {
         if (value.isNullOrBlank()) return null
         parseDateTime(value, zone)?.let { return it.first }
         return runCatching { LocalDate.parse(value.take(10)) }.getOrNull()
+    }
+
+    /** Ein Zeitpunkt mit Zone oder Z; alles andere - etwa eine Wanduhrzeit - ergibt null. */
+    fun parseInstant(value: String?): Instant? {
+        if (value.isNullOrBlank() || !value.contains('T')) return null
+        return runCatching { Instant.parse(value) }.getOrNull()
+            ?: runCatching { OffsetDateTime.parse(value).toInstant() }.getOrNull()
     }
 
     fun parseTime(value: String?): LocalTime? {

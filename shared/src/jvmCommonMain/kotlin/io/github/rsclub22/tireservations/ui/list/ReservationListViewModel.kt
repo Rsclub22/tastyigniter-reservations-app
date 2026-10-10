@@ -50,6 +50,12 @@ data class ListState(
     val offeneGesamt: Int = 0,
     /** Plaetze des Hauses; daran werden Sperrvermerke erkannt. 0 = unbekannt. */
     val hausgroesse: Int = 0,
+    /**
+     * Als Kunde angemeldet: der Server liefert nur die eigenen Reservierungen und
+     * verweigert Stammdaten, Intern-Endpunkte und jede Aenderung. Die Liste zeigt
+     * dann alle eigenen statt eines Tages, und nichts, was ohnehin 403 ergaebe.
+     */
+    val kundenansicht: Boolean = false,
 ) {
     /**
      * Ein Sperrvermerk ist eine Pseudo-Reservierung, die einen Tag verriegelt,
@@ -73,8 +79,8 @@ class ReservationListViewModel(
 
     init {
         viewModelScope.launch {
-            val defaultLocation = settingsStore.settings.first().defaultLocationId
-            _state.update { it.copy(locationId = defaultLocation) }
+            val einstellungen = settingsStore.settings.first()
+            _state.update { it.copy(locationId = einstellungen.defaultLocationId, kundenansicht = !einstellungen.isAdmin) }
             loadLookups()
             load()
             ladeOffene()
@@ -96,6 +102,7 @@ class ReservationListViewModel(
      * deswegen mit einem Fehler zu behelligen waere unverhaeltnismaessig.
      */
     private suspend fun ladeOffene() {
+        if (_state.value.kundenansicht) return
         // seit = 0 liefert alle unbestaetigten, nicht nur die seit dem letzten
         // Blick hinzugekommenen. Der Merker gehoert allein den Benachrichtigungen;
         // die Markierung soll zeigen, was insgesamt offen ist.
@@ -112,7 +119,9 @@ class ReservationListViewModel(
 
     private suspend fun loadLookups() {
         runCatching {
-            val locations = repository.locations()
+            // Standorte bekommt nur das Haus; dem Gast antwortet der Server mit 403,
+            // und das soll nicht als Fehler ueber seiner Liste stehen.
+            val locations = if (_state.value.kundenansicht) emptyList() else repository.locations()
             val statuses = repository.statuses()
             _state.update { s ->
                 s.copy(
@@ -127,7 +136,7 @@ class ReservationListViewModel(
 
     fun refresh() {
         viewModelScope.launch {
-            if (_state.value.locations.isEmpty()) loadLookups()
+            if (_state.value.locations.isEmpty() && !_state.value.kundenansicht) loadLookups()
             load(pullToRefresh = true)
             ladeOffene()
         }
@@ -181,7 +190,7 @@ class ReservationListViewModel(
                 )
             }
             val query = ReservationQuery(
-                date = if (s.isSearching) null else s.date,
+                date = if (s.isSearching || s.kundenansicht) null else s.date,
                 locationId = s.locationId,
                 statusId = s.statusId,
                 search = s.search.takeIf { s.isSearching },

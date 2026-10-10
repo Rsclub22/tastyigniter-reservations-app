@@ -134,6 +134,7 @@ private fun AppNavHost(
             val id = entry.arguments?.read { getLongOrNull("id") } ?: return@composable
             ReservationDetailScreen(
                 repository = repository,
+                settingsStore = settingsStore,
                 reservationId = id,
                 onBack = { nav.popBackStack() },
                 onEdit = { nav.navigate(Routes.edit(id = it)) },

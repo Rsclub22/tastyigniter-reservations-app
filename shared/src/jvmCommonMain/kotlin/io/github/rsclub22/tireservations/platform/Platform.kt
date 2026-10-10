@@ -1,11 +1,12 @@
 package io.github.rsclub22.tireservations.platform
 
+import io.github.rsclub22.tireservations.data.Kalendereintrag
 import io.github.rsclub22.tireservations.data.Tagesblatt
 
 /**
  * Das Wenige, was Android und Desktop unterschiedlich machen müssen.
  *
- * Bewusst flach gehalten: fünf Deklarationen, keine Abstraktionsschicht. Alles
+ * Bewusst flach gehalten: eine Handvoll Deklarationen, keine Abstraktionsschicht. Alles
  * andere - Datenlayer, Bildschirme, Navigation, ViewModels - ist bei beiden Zielen
  * derselbe Code, weil beide auf der JVM laufen.
  */
@@ -30,6 +31,17 @@ expect fun composeMail(address: String, subject: String): Boolean
 
 /** Öffnet eine Adresse im Browser. Gibt false zurück, wenn keiner gefunden wurde. */
 expect fun openUrl(url: String): Boolean
+
+/**
+ * Legt dem Gast den Eintrag zum Speichern vor.
+ *
+ * Am Telefon in der Kalender-App - meist Google Kalender, sonst die, die dort
+ * eingerichtet ist. Der Desktop hat keine Kalender-App und oeffnet den
+ * Vorlagen-Link von Google Kalender im Browser.
+ *
+ * @return false, wenn weder Kalender-App noch Browser da sind.
+ */
+expect fun trageInKalenderEin(eintrag: Kalendereintrag): Boolean
 
 /**
  * Kann diese Fassung sich selbst erneuern?

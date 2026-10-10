@@ -31,6 +31,8 @@ jetbrains-lifecycle-runtime-compose = { group = "org.jetbrains.androidx.lifecycl
 jetbrains-lifecycle-viewmodel-compose = { group = "org.jetbrains.androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 jetbrains-navigation-compose = { group = "org.jetbrains.androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
 compose-material-icons-extended = { group = "org.jetbrains.compose.material", name = "material-icons-extended", version.ref = "composeIcons" }
+# BackHandler fuer beide Ziele; haengt an derselben Version wie compose.ui.
+compose-ui-backhandler = { group = "org.jetbrains.compose.ui", name = "ui-backhandler", version.ref = "composeMultiplatform" }
 androidx-datastore-preferences-core = { group = "androidx.datastore", name = "datastore-preferences-core", version.ref = "datastore" }
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }

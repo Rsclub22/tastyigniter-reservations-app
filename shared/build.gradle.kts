@@ -50,6 +50,7 @@ kotlin {
             api(compose.foundation)
             api(compose.material3)
             api(compose.ui)
+            implementation(libs.compose.ui.backhandler)
             implementation(libs.compose.material.icons.extended)
 
             implementation(libs.jetbrains.lifecycle.runtime.compose)

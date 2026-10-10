@@ -112,4 +112,13 @@ class WachdienstTest {
         // Bliebe der Merker stehen, kaeme beim naechsten Blick dieselbe Meldung.
         assertEquals(190, e.neuerMerker)
     }
+
+    @Test
+    fun `sieht nur fuer angemeldete Mitarbeiter nach`() {
+        val mitarbeiter = AppSettings(baseUrl = "https://r.de/api", token = "t", isAdmin = true)
+        assertTrue(Wachdienst.zustaendig(mitarbeiter))
+        // Ein Kunden-Token darf /intern/offen nicht abfragen; jeder Lauf endete mit 403.
+        assertFalse(Wachdienst.zustaendig(mitarbeiter.copy(isAdmin = false)))
+        assertFalse(Wachdienst.zustaendig(mitarbeiter.copy(token = null)))
+    }
 }

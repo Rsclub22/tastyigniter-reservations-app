@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Event
+import androidx.compose.material.icons.outlined.EventAvailable
 import androidx.compose.material.icons.outlined.Group
 import androidx.compose.material.icons.automirrored.outlined.PhoneForwarded
 import androidx.compose.material.icons.outlined.Place
@@ -56,8 +57,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.rsclub22.tireservations.data.ApiException
+import io.github.rsclub22.tireservations.data.Kalender
+import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.platform.composeMail
 import io.github.rsclub22.tireservations.platform.dialNumber
+import io.github.rsclub22.tireservations.platform.trageInKalenderEin
 import io.github.rsclub22.tireservations.ui.components.Meldungen
 import io.github.rsclub22.tireservations.data.Reservation
 import io.github.rsclub22.tireservations.data.ReservationRepository
@@ -72,6 +76,7 @@ import io.github.rsclub22.tireservations.ui.components.senkrechtSchiebbar
 import io.github.rsclub22.tireservations.ui.components.statusLabel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -86,10 +91,13 @@ data class DetailState(
     /** Die Reservierung kam ohne Statusangabe vom Server (siehe [ReservationList]). */
     val statusMissing: Boolean = false,
     val unauthorized: Boolean = false,
+    /** Als Kunde angemeldet: nur ansehen und in den Kalender eintragen (siehe [ListState]). */
+    val kundenansicht: Boolean = false,
 )
 
 class ReservationDetailViewModel(
     private val repository: ReservationRepository,
+    settingsStore: SettingsStore,
     private val id: Long,
 ) : ViewModel() {
     private val _state = MutableStateFlow(DetailState())
@@ -97,7 +105,12 @@ class ReservationDetailViewModel(
 
     private var shownBefore = false
 
-    init { load() }
+    init {
+        viewModelScope.launch {
+            _state.update { it.copy(kundenansicht = !settingsStore.settings.first().isAdmin) }
+            load()
+        }
+    }
 
     /** Reloads when coming back from the edit screen. */
     fun onScreenShown() {
@@ -110,7 +123,8 @@ class ReservationDetailViewModel(
             _state.update { it.copy(loading = it.reservation == null, error = null) }
             runCatching {
                 val loaded = repository.reservation(id)
-                val statuses = repository.statuses()
+                // Dem Gast nuetzt die Statusliste nichts; er darf nichts umstellen.
+                val statuses = if (_state.value.kundenansicht) emptyList() else repository.statuses()
                 _state.update { it.copy(reservation = loaded.reservation, statusMissing = loaded.statusMissing, statuses = statuses, loading = false) }
             }.onFailure(::fail)
         }
@@ -155,13 +169,14 @@ class ReservationDetailViewModel(
 @Composable
 fun ReservationDetailScreen(
     repository: ReservationRepository,
+    settingsStore: SettingsStore,
     reservationId: Long,
     onBack: () -> Unit,
     onEdit: (Long) -> Unit,
     onUnauthorized: () -> Unit,
 ) {
     val vm: ReservationDetailViewModel = viewModel(key = "detail-$reservationId") {
-        ReservationDetailViewModel(repository, reservationId)
+        ReservationDetailViewModel(repository, settingsStore, reservationId)
     }
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
@@ -189,7 +204,8 @@ fun ReservationDetailScreen(
                     }
                 },
                 actions = {
-                    if (state.reservation != null) {
+                    // Aendern und Loeschen weist der Server dem Gast mit 403 ab.
+                    if (state.reservation != null && !state.kundenansicht) {
                         IconButton(onClick = { onEdit(reservationId) }, enabled = !state.busy) {
                             Icon(Icons.Outlined.Edit, contentDescription = "Bearbeiten")
                         }
@@ -240,11 +256,24 @@ fun ReservationDetailScreen(
                     }
                 }
 
+                if (state.kundenansicht) {
+                    Kalender.eintrag(r)?.let { eintrag ->
+                        FilledTonalButton(onClick = {
+                            if (!trageInKalenderEin(eintrag)) Meldungen.zeige("Keine Kalender-App gefunden")
+                        }) {
+                            Icon(Icons.Outlined.EventAvailable, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("In Kalender eintragen")
+                        }
+                    }
+                }
+
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         InfoRow(Icons.Outlined.Call, r.telephone.ifBlank { "–" })
                         InfoRow(Icons.Outlined.Email, r.email.ifBlank { "–" })
-                        FlowRow(
+                        // Der Gast braucht keine Knoepfe, um sich selbst anzurufen.
+                        if (!state.kundenansicht) FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
@@ -279,15 +308,17 @@ fun ReservationDetailScreen(
                     }
                 }
 
-                HorizontalDivider()
-                Text("Status ändern", style = MaterialTheme.typography.titleMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.statuses.forEach { status ->
-                        val current = status.id == r.statusId
-                        OutlinedButton(
-                            onClick = { pendingStatus = status },
-                            enabled = !current && !state.busy,
-                        ) { Text(statusLabel(status)) }
+                if (!state.kundenansicht) {
+                    HorizontalDivider()
+                    Text("Status ändern", style = MaterialTheme.typography.titleMedium)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.statuses.forEach { status ->
+                            val current = status.id == r.statusId
+                            OutlinedButton(
+                                onClick = { pendingStatus = status },
+                                enabled = !current && !state.busy,
+                            ) { Text(statusLabel(status)) }
+                        }
                     }
                 }
                 r.createdAt?.let {

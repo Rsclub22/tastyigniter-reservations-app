@@ -1,5 +1,6 @@
 package io.github.rsclub22.tireservations.data
 
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -7,14 +8,23 @@ data class Reservation(
     val id: Long,
     val locationId: Long?,
     val locationName: String?,
+    /** Anschrift des Standorts, eine Zeile; nur fuer den Kalendereintrag des Gastes. */
+    val locationAddress: String?,
     val guestNum: Int,
     val firstName: String,
     val lastName: String,
     val email: String,
     val telephone: String,
     val comment: String,
+    /** Datum und Uhrzeit, wie sie im Restaurant gelten - unabhaengig von der Zone des Geraets. */
     val date: LocalDate?,
     val time: LocalTime?,
+    /**
+     * Derselbe Beginn als Zeitpunkt (der Server rechnet ihn in UTC um). Nur damit
+     * trifft ein Kalendereintrag auch auf einem Geraet in einer anderen Zone die
+     * richtige Stunde. Null, wenn der Server das Feld nicht liefert.
+     */
+    val beginn: Instant?,
     /** Stay time in minutes, `null` means "location default". */
     val duration: Int?,
     val statusId: Long?,

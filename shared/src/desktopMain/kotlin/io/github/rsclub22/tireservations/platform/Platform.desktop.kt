@@ -1,5 +1,7 @@
 package io.github.rsclub22.tireservations.platform
 
+import io.github.rsclub22.tireservations.data.Kalender
+import io.github.rsclub22.tireservations.data.Kalendereintrag
 import io.github.rsclub22.tireservations.data.Tagesblatt
 import java.awt.Desktop
 import java.awt.print.PageFormat
@@ -56,6 +58,9 @@ actual fun composeMail(address: String, subject: String): Boolean {
 }
 
 actual fun openUrl(url: String): Boolean = browse(URI(url))
+
+/** Keine Kalender-App auf dem Desktop: Google Kalender im Browser, mit vorbelegtem Eintrag. */
+actual fun trageInKalenderEin(eintrag: Kalendereintrag): Boolean = openUrl(Kalender.googleLink(eintrag))
 
 private fun browse(uri: URI): Boolean = runCatching {
     val desktop = Desktop.getDesktop()
