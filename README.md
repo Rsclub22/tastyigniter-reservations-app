@@ -10,6 +10,11 @@ eigener Server benötigt.
 ## Funktionen
 
 - **Anmeldung** mit dem TastyIgniter-Admin-Zugang (Mitarbeiter) – optional auch als Kunde
+- **Kundenansicht**: als Kunde angemeldet zeigt die App nur die eigenen Reservierungen (alle auf
+  einmal, mit Datum) und bietet an, sie **in den Kalender einzutragen** (am Telefon über die
+  Kalender-App, auf dem Desktop über Google Kalender im Browser). Anlegen, Ändern,
+  Status und die Intern-Funktionen bleiben dem Haus vorbehalten – der Server verweigert sie dem
+  Kunden-Token ohnehin, und nur das Webformular prüft Sperrtage und Küchenschluss.
 - **Tagesansicht**: Reservierungen je Tag, vor/zurück blättern, Datum wählen, Summe der Gäste
 - **Filter** nach Standort und Status, **Suche** nach Name, E-Mail, Telefon oder Reservierungsnummer
 - **Neue Reservierung** anlegen: Standort, Datum, Uhrzeit, Personen, Dauer, Gastdaten, Anmerkungen,
@@ -19,8 +24,9 @@ eigener Server benötigt.
   E-Mail-Benachrichtigung an den Gast
 - Gast direkt **anrufen** oder **per E-Mail** kontaktieren
 - Standard-Standort für Betriebe mit mehreren Filialen
-- Update-Hinweis bei neuen GitHub-Releases (nicht bei Installation aus dem Play Store);
-  am Telefon gegen die APK im Release, auf dem Desktop gegen das .deb-Paket
+- Update-Hinweis bei neuen GitHub-Releases; am Telefon gegen die APK im Release, auf dem
+  Desktop gegen das .deb-Paket. Kommt die App aus dem Play Store, verweisen die
+  Einstellungen stattdessen auf die Store-Seite
 - Material 3, Dark Mode, dynamische Farben (nur Android 12+; der Desktop nutzt die
   festen Farben des Themes)
 

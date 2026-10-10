@@ -39,6 +39,8 @@ import io.github.rsclub22.tireservations.data.Location
 import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.data.UpdateChecker
+import io.github.rsclub22.tireservations.platform.openUrl
+import io.github.rsclub22.tireservations.ui.components.Meldungen
 import io.github.rsclub22.tireservations.ui.components.senkrechtSchiebbar
 import io.github.rsclub22.tireservations.ui.update.UpdateDialog
 import kotlinx.coroutines.launch
@@ -115,7 +117,8 @@ fun SettingsScreen(
                 HorizontalDivider()
             }
 
-            ListItem(
+            // Stammdaten bekommt nur das Haus; dem Gast verweigert sie der Server.
+            if (settings.isAdmin) ListItem(
                 headlineContent = { Text("Stammdaten neu laden") },
                 supportingContent = {
                     Text(if (cacheCleared) "Erledigt – Standorte, Tische und Status werden neu geladen." else "Standorte, Tische und Status vom Server abrufen")
@@ -144,19 +147,31 @@ fun SettingsScreen(
                 supportingContent = { Text(versionLabel) },
                 leadingContent = { Icon(Icons.Outlined.Info, contentDescription = null) },
             )
+            // Drei Bezugswege: Play Store (AAB aus der CI), Paket von GitHub (APK
+            // bzw. .deb) oder Entwicklungsfassung ohne jede Pruefung.
+            val storeUrl = updateChecker.storeUrl
             ListItem(
-                headlineContent = { Text("Nach Updates suchen") },
+                headlineContent = { Text("Updates") },
                 supportingContent = {
                     Text(
                         when {
-                            !updateChecker.isEnabled -> "Updates kommen über Google Play."
+                            storeUrl != null -> "Via Play Store · antippen öffnet die Store-Seite"
+                            !updateChecker.isEnabled -> "Entwicklungsfassung · keine Update-Prüfung"
                             checkingUpdate -> "Suche …"
-                            else -> updateStatus ?: "Neue Versionen von GitHub prüfen"
+                            else -> updateStatus
+                                ?: "Via ${updateChecker.paketName} von GitHub · antippen prüft auf eine neue Version"
                         },
                     )
                 },
                 leadingContent = { Icon(Icons.Outlined.SystemUpdate, contentDescription = null) },
-                modifier = Modifier.selectable(selected = false, enabled = updateChecker.isEnabled && !checkingUpdate) {
+                modifier = Modifier.selectable(
+                    selected = false,
+                    enabled = storeUrl != null || (updateChecker.isEnabled && !checkingUpdate),
+                ) {
+                    if (storeUrl != null) {
+                        if (!openUrl(storeUrl)) Meldungen.zeige("Play Store nicht gefunden")
+                        return@selectable
+                    }
                     checkingUpdate = true
                     scope.launch {
                         runCatching { updateChecker.check() }

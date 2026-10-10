@@ -18,14 +18,17 @@ class ReservationsApp : Application() {
         super.onCreate()
         initAndroidPlatform(this)
 
+        val ausDemPlayStore = isFromPlayStore(this)
         AppGraph.init(
             debug = BuildConfig.DEBUG,
             // Leer schaltet die Update-Prüfung ab: im Debug-Build (eigene App mit
             // Suffix ".debug") und wenn der Play Store die Updates ohnehin macht.
-            updateRepo = if (BuildConfig.DEBUG || isFromPlayStore(this)) "" else BuildConfig.UPDATE_REPO,
+            updateRepo = if (BuildConfig.DEBUG || ausDemPlayStore) "" else BuildConfig.UPDATE_REPO,
             versionName = BuildConfig.VERSION_NAME,
             userAgent = "TIReservations-Android",
             assetSuffix = ".apk",
+            // Die Einstellungen verweisen dann auf die Store-Seite statt auf GitHub.
+            storeUrl = if (ausDemPlayStore) "https://play.google.com/store/apps/details?id=$packageName" else null,
         )
 
         // Auch bei geschlossener App nach neuen unbestaetigten Reservierungen sehen.

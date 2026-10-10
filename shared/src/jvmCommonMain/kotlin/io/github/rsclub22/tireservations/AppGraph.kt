@@ -64,6 +64,8 @@ object AppGraph {
         userAgent: String,
         /** Endung des Release-Anhangs dieser Plattform: `.apk` bzw. `.deb`. */
         assetSuffix: String,
+        /** Store-Seite der App, wenn der Store die Updates macht; sonst null. */
+        storeUrl: String? = null,
     ) {
         // Android ruft das aus Application.onCreate, der Desktop aus main(). Ein
         // zweiter Aufruf wuerde neue Clients erzeugen, an denen niemand haengt.
@@ -93,6 +95,7 @@ object AppGraph {
             versionName,
             userAgent = userAgent,
             assetSuffix = assetSuffix,
+            storeUrl = storeUrl,
         )
     }
 }

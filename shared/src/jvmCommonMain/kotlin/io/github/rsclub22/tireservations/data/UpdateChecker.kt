@@ -47,10 +47,19 @@ class UpdateChecker(
      * Release-Seite, statt einem Desktop eine APK anzubieten.
      */
     val assetSuffix: String = ".apk",
+    /**
+     * Seite der App im Store, wenn der Store die Updates macht (Play-Store-Fassung
+     * aus dem AAB). Dann ist [repo] leer, und die Einstellungen verweisen auf den
+     * Store statt auf GitHub.
+     */
+    val storeUrl: String? = null,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
     val isEnabled: Boolean get() = repo.isNotBlank()
+
+    /** Wie die Pakete von GitHub heissen - fuer den Text in den Einstellungen. */
+    val paketName: String get() = if (assetSuffix.equals(".apk", ignoreCase = true)) "APK" else "Paket"
 
     /** Returns the newer release, or `null` if the app is up to date or nothing is published yet. */
     suspend fun check(): AppUpdate? = withContext(Dispatchers.IO) {
