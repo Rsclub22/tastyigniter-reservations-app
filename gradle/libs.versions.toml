@@ -1,6 +1,6 @@
 [versions]
 agp = "9.4.1"
-kotlin = "2.4.20"
+kotlin = "2.4.21"
 # Compose Multiplatform. 1.12.1 behebt laut Release-Notes die Kompatibilität mit
 # Kotlin 2.5 und deckt damit das hier verwendete 2.4.20 ab.
 composeMultiplatform = "1.12.1"
