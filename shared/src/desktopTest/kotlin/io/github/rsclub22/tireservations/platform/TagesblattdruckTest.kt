@@ -124,6 +124,34 @@ class TagesblattdruckTest {
     }
 
     @Test
+    fun `die Personenzahl steht rot auf dem Blatt`() {
+        // Das Rot aus dem HTML fuer Android kam auf dem Desktop zuerst nicht an,
+        // weil das Blatt hier selbst gezeichnet wird. Deshalb der Blick aufs Bild.
+        val bild = BufferedImage(595, 842, BufferedImage.TYPE_INT_RGB)
+        val g = bild.createGraphics()
+        g.color = java.awt.Color.WHITE
+        g.fillRect(0, 0, 595, 842)
+        Tagesblattdruck(blatt(8), "Gasthaus", "24.12.2026").print(g, a4Hoch(), 0)
+        g.dispose()
+
+        // Das Antialiasing mischt die kleinen Ziffern mit dem weissen Grund, exakt
+        // #A8321F steht deshalb nirgends. Die Schranken lassen das Rot samt seiner
+        // hellen Mischstufen durch, aber weder das Braun der Kopflinie noch das Gold
+        // der Vermerke - sonst wuerde der Test auch ohne rote Personenzahl bestehen.
+        var gefunden = false
+        for (x in 0 until bild.width) {
+            for (y in 0 until bild.height) {
+                val p = bild.getRGB(x, y)
+                val r = p shr 16 and 0xFF
+                val gr = p shr 8 and 0xFF
+                val b = p and 0xFF
+                if (r in 0x90..0xC8 && gr <= 0x60 && b <= 0x55) gefunden = true
+            }
+        }
+        assertTrue("Kein Pixel im Personen-Rot #A8321F auf dem Blatt", gefunden)
+    }
+
+    @Test
     fun `hinter der letzten Seite kommt nichts mehr`() {
         val format = a4Hoch()
         val druck = Tagesblattdruck(blatt(8), "Gasthaus Zum braunen Roß", "24.12.2026")

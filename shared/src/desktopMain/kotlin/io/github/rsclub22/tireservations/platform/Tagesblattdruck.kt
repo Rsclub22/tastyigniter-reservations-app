@@ -262,7 +262,10 @@ internal class Tagesblattdruck(
             g.drawString(kuerzen(g, r.name.ifBlank { "—" }, SPALTENBREITEN[2] * breite - 6f), spalten[2], y)
 
             g.font = FONT_NORMAL
+            // Rot wie im HTML fuer Android: die Zahl soll beim Eindecken sofort ins Auge fallen.
+            g.color = ROT
             rechts(g, r.gaeste.toString(), spalten[3] + SPALTENBREITEN[3] * breite - ABSTAND, y)
+            g.color = SCHWARZ
             g.drawString(kuerzen(g, r.tischeText, SPALTENBREITEN[4] * breite - 6f), spalten[4], y)
             g.drawString(kuerzen(g, r.telefon, SPALTENBREITEN[5] * breite - 6f), spalten[5], y)
 
@@ -369,6 +372,7 @@ internal class Tagesblattdruck(
         val GRAU = Color(0x6B, 0x5B, 0x53)
         val LINIE = Color(0xE4, 0xDA, 0xD3)
         val BRAUN = Color(0x60, 0x21, 0x0F)
+        val ROT = Color(0xA8, 0x32, 0x1F)
         val GOLD = Color(0xB8, 0x86, 0x0B)
         val SAND = Color(0xFA, 0xF5, 0xEC)
 
