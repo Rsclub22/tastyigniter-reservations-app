@@ -156,6 +156,8 @@ object Druckblatt {
         .s-haken { width: 26px; }
         .s-zeit { width: 52px; font-variant-numeric: tabular-nums; font-weight: 700; }
         .s-pers { width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+        /* Nur die Zellen, nicht die Ueberschrift: th wuerde sonst mitgefaerbt. */
+        td.s-pers { color: #A8321F; }
         .s-tisch { width: 26%; }
         .s-tel { width: 22%; font-variant-numeric: tabular-nums; }
         .s-nr { width: 46px; text-align: right; color: #7A6A62; }
