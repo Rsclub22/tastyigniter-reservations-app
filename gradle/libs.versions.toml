@@ -3,7 +3,7 @@ agp = "9.4.1"
 kotlin = "2.4.20"
 # Compose Multiplatform. 1.12.1 behebt laut Release-Notes die Kompatibilität mit
 # Kotlin 2.5 und deckt damit das hier verwendete 2.4.20 ab.
-composeMultiplatform = "1.12.1"
+composeMultiplatform = "1.12.2"
 # Die erweiterten Material-Icons werden seit 1.7.3 nicht mehr weitergepflegt. Die
 # Release-Notes von CMP 1.8.0 sagen für das Schwesterpaket material-icons-core
 # ausdrücklich, man solle es auf 1.7.3 pinnen - für extended gilt dasselbe. Das
