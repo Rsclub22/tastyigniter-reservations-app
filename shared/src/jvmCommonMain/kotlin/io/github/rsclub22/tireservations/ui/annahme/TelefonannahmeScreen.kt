@@ -164,22 +164,14 @@ fun TelefonannahmeScreen(
                 when {
                     state.laden && tag == null -> LoadingBox()
                     tag != null -> {
-                        // Am Telefon steht der Gast vor der Belegung, auf dem
-                        // Desktop danach wie auf /intern.
-                        //
-                        // Der Grund ist der Ablauf: Name und Nummer werden
-                        // getippt, waehrend der Gast redet, und der Klick auf die
-                        // Uhrzeit nimmt an. Stehen die Zeiten oben, tippt man
-                        // unten und muss zum Abschliessen wieder hoch - auf dem
-                        // breiten Schirm faellt das nicht auf, weil dort beides
-                        // gleichzeitig zu sehen ist.
-                        if (breit) {
-                            BelegungKarte(state, tag, vm, breit)
-                            GastKarte(state, vm, breit)
-                        } else {
-                            GastKarte(state, vm, breit)
-                            BelegungKarte(state, tag, vm, breit)
-                        }
+                        // Der Gast steht vor der Belegung, auf jedem Geraet und
+                        // auf /intern gleich. Der Grund ist der Ablauf: Name und
+                        // Nummer werden getippt, waehrend der Gast redet, und der
+                        // Klick auf die Uhrzeit nimmt an. Stehen die Zeiten oben,
+                        // muss man zum Abschliessen wieder hoch - auch auf dem
+                        // breiten Schirm, das hat sich am Tresen gezeigt.
+                        GastKarte(state, vm, breit)
+                        BelegungKarte(state, tag, vm, breit)
                     }
                 }
             }
@@ -499,9 +491,7 @@ private fun BelegungKarte(state: AnnahmeState, tag: Tagesdaten, vm: Telefonannah
 
         Text(
             buildString {
-                append("Ein Klick auf die Uhrzeit nimmt die Reservierung mit den ")
-                append(if (breit) "unten" else "oben")
-                append(" eingetragenen Daten an. ")
+                append("Ein Klick auf die Uhrzeit nimmt die Reservierung mit den oben eingetragenen Daten an. ")
 
                 // Der Tag kann gemischt sein: ein Abendvermerk laesst den
                 // Mittagstisch offen. Dann steht hier beides, sonst raet man am
@@ -659,7 +649,7 @@ private fun GastKarte(state: AnnahmeState, vm: TelefonannahmeViewModel, breit: B
         Text(
             "Wird sofort als bestätigt gespeichert. Der Tisch wird automatisch zugewiesen. " +
                 "Es wird keine E-Mail verschickt – weder an den Gast noch ans Haus. " +
-                "Ohne Klick auf eine Uhrzeit ${if (breit) "oben" else "unten"} fehlt die Zeit.",
+                "Ohne Klick auf eine Uhrzeit unten fehlt die Zeit.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
