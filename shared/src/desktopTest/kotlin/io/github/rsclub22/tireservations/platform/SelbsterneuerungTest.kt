@@ -183,4 +183,19 @@ class SelbsterneuerungTest {
         val reste = ordner.root.listFiles()!!.filter { it.name.startsWith(".erneuerung-") }
         assertTrue("Übrig geblieben: $reste", reste.isEmpty())
     }
+
+    /**
+     * Der jpackage-Starter setzt _JPACKAGE_LAUNCHER in seiner eigenen Umgebung, und die
+     * JVM reicht sie an jeden Kindprozess weiter. Findet der Starter des Nachfolgers die
+     * Variable vor, haelt er sich fuer einen Hilfsprozess, gibt die Hilfe von `java` aus
+     * und endet mit 1 - am Tresenrechner nachgestellt am 25.10.2026.
+     */
+    @Test
+    fun `der Nachfolger erbt die Kennung des alten Starters nicht`() {
+        val umgebung = mutableMapOf("_JPACKAGE_LAUNCHER" to "12345", "DISPLAY" to ":0")
+
+        Selbsterneuerung.bereinigeUmgebung(umgebung)
+
+        assertEquals(mapOf("DISPLAY" to ":0"), umgebung)
+    }
 }

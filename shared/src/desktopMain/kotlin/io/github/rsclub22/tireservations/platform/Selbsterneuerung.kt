@@ -30,6 +30,14 @@ internal object Selbsterneuerung {
     private const val START_WARTEZEIT_S = 4L
 
     /**
+     * Kennung, die der jpackage-Starter in seine eigene Umgebung schreibt. Findet ein
+     * Starter sie beim Start vor, haelt er sich fuer den inneren Aufruf und reicht die
+     * Argumente an `java` durch - ohne Hauptklasse gibt das nur die Hilfe von `java`
+     * aus und endet mit 1.
+     */
+    private const val JPACKAGE_KENNUNG = "_JPACKAGE_LAUNCHER"
+
+    /**
      * Das Verzeichnis der Installation - also das mit bin/ und lib/ darin.
      *
      * jpackage setzt `jpackage.app-path` auf den Starter. Fehlt die Angabe (Start
@@ -116,6 +124,7 @@ internal object Selbsterneuerung {
                     .directory(wurzel)
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD)
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .apply { bereinigeUmgebung(environment()) }
                     .start()
             }.getOrNull() ?: continue
 
@@ -128,6 +137,21 @@ internal object Selbsterneuerung {
 
         return "Die neue Fassung ist eingespielt, ließ sich aber nicht starten. " +
             "Bitte das Programm von Hand starten."
+    }
+
+    /**
+     * Entfernt, was der Nachfolger nicht vom alten Starter erben darf.
+     *
+     * Die JVM gibt ihre Umgebung samt der Kennung des jpackage-Starters an jeden
+     * Kindprozess weiter. Der neue Starter nahm sich deshalb fuer den inneren Aufruf,
+     * gab die Hilfe von `java` aus und endete nach einer halben Sekunde - beide
+     * Startversuche, mit und ohne setsid. Zurueck blieb die alte Fassung mit der
+     * Meldung, die neue liesse sich nicht starten, obwohl sie schon eingespielt war.
+     * Am Tresenrechner nachgestellt am 25.10.2026; aus einer Shell gestartet lief
+     * dieselbe Fassung, weil dort die Kennung fehlt.
+     */
+    internal fun bereinigeUmgebung(umgebung: MutableMap<String, String>) {
+        umgebung.remove(JPACKAGE_KENNUNG)
     }
 
     /**

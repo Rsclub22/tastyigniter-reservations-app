@@ -121,6 +121,14 @@ compose.desktop {
         // und schaltet damit die Update-Pruefung aus.
         jvmArgs += "-Dapp.version=$appVersion"
 
+        // Kindprozesse ohne jspawnhelper starten. Standard ist POSIX_SPAWN ueber
+        // lib/runtime/lib/jspawnhelper, und der verweigert den Dienst, wenn er aus
+        // einem anderen JDK-Build stammt als die laufende JVM. Genau das ist er nach
+        // der Selbsterneuerung: der Neustart laeuft, wenn unter demselben Pfad schon
+        // die Laufzeit der neuen Fassung liegt. Sobald die CI ein neueres Temurin
+        // zieht, kam der Nachfolger nie zustande ("Incorrect Java version").
+        jvmArgs += "-Djdk.lang.Process.launchMechanism=FORK"
+
         nativeDistributions {
             // jpackage baut nur fuer das System, auf dem es laeuft - deshalb die
             // Matrix in der CI. Compose Multiplatform kennt Deb/Rpm/Msi/Exe/Dmg/Pkg,
