@@ -15,7 +15,7 @@ activityCompose = "1.11.0"
 # Multiplatform-Ports von JetBrains (org.jetbrains.androidx.*), nicht die
 # Android-Fassungen aus androidx.*.
 lifecycle = "2.11.0"
-navigation = "2.9.2"
+navigation = "2.10.0"
 # datastore-preferences-core ist die multiplatform-fähige Variante; das frühere
 # datastore-preferences hing an einem android.content.Context.
 datastore = "1.2.1"
