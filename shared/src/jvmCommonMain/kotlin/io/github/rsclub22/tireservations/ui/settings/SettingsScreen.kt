@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SystemUpdate
+import androidx.compose.material.icons.outlined.TableRestaurant
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -53,6 +54,7 @@ fun SettingsScreen(
     updateChecker: UpdateChecker,
     versionLabel: String,
     onBack: () -> Unit,
+    onLokal: () -> Unit,
     onLoggedOut: () -> Unit,
 ) {
     val settings by settingsStore.settings.collectAsStateWithLifecycle(initialValue = AppSettings())
@@ -89,6 +91,12 @@ fun SettingsScreen(
                     headlineContent = { Text("Ohne Server") },
                     supportingContent = { Text("Die Reservierungen liegen nur auf diesem Gerät.") },
                     leadingContent = { Icon(Icons.Outlined.Dns, contentDescription = null) },
+                )
+                ListItem(
+                    headlineContent = { Text("Öffnungszeiten, Tische und Räume") },
+                    supportingContent = { Text("Was sonst der Server vorgibt") },
+                    leadingContent = { Icon(Icons.Outlined.TableRestaurant, contentDescription = null) },
+                    modifier = Modifier.selectable(selected = false, onClick = onLokal),
                 )
             } else {
                 ListItem(

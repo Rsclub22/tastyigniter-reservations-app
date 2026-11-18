@@ -26,18 +26,20 @@ import java.time.temporal.ChronoUnit
  *
  * Status und Standort sind fest: die drei Status, die TastyIgniter frisch
  * anlegt, mit denselben Nummern, und ein einziger Standort. So verhalten sich
- * Filter, Farben und Beschriftungen wie gewohnt, ohne dass jemand Stammdaten
- * pflegen muss, bevor die erste Reservierung eingetragen werden kann.
+ * Filter, Farben und Beschriftungen wie gewohnt. Tische, Raeume und
+ * Oeffnungszeiten stehen in [LokalStammdaten] in derselben Datei.
  *
- * Die Funktionen der Server-Erweiterung (Telefonannahme, Tagesblatt, Monat,
- * Sperrtage) kommen in einem spaeteren Schritt; bis dahin melden sie sich wie
- * ein Server, der sie nicht kennt.
+ * Telefonannahme und Sperrtage rechnet [LokalRechnung]. Tagesblatt und Monat
+ * kommen in einem spaeteren Schritt; bis dahin melden sie sich wie ein Server,
+ * der sie nicht kennt.
  */
 class LokalBackend(
     private val datei: File,
     private val zone: ZoneId = ZoneId.systemDefault(),
     private val jetzt: () -> Instant = Instant::now,
 ) : Backend {
+
+    private val jetztHier: LocalDateTime get() = LocalDateTime.ofInstant(jetzt(), zone)
 
     private val mutex = Mutex()
 
@@ -57,23 +59,24 @@ class LokalBackend(
         val items = s.reservierungen
             .asSequence()
             .filter { query.date == null || it.datum == query.date.toString() }
-            .filter { query.locationId == null || query.locationId == STANDORT.id }
+            .filter { query.locationId == null || query.locationId == standort(s).id }
             .filter { query.statusId == null || it.statusId == query.statusId }
             .filter { suche == null || it.trifft(suche) }
-            .map { it.alsReservierung() }
+            .map { it.alsReservierung(s) }
             .sortedWith(compareBy(nullsLast()) { r: Reservation -> r.date }.thenBy(nullsLast()) { it.time }.thenBy { it.id })
             .toList()
         ReservationList(items)
     }
 
     override suspend fun reservation(id: Long): LoadedReservation = lesen { s ->
-        LoadedReservation(s.finde(id).alsReservierung())
+        LoadedReservation(s.finde(id).alsReservierung(s))
     }
 
     override suspend fun createReservation(draft: ReservationDraft): Long = aendern { s ->
         pruefe(draft)
         val id = s.naechsteId
-        val neu = draft.alsEintrag(id, statusId = draft.statusId ?: AUSSTEHEND, angelegt = jetzt().toString())
+        val tische = rechnung(s).tischeFuerFormular(draft, ignoriere = null)
+        val neu = draft.alsEintrag(id, statusId = draft.statusId ?: AUSSTEHEND, angelegt = jetzt().toString(), tische = tische)
         s.copy(naechsteId = id + 1, reservierungen = s.reservierungen + neu) to id
     }
 
@@ -81,7 +84,8 @@ class LokalBackend(
         pruefe(draft)
         val alt = s.finde(id)
         // Der Status aendert sich nur ueber updateStatus, wie beim Server.
-        val neu = draft.alsEintrag(id, statusId = alt.statusId, angelegt = alt.angelegt)
+        // Beim Aendern wird nicht neu verteilt: wer die Tische abwaehlt, meint das.
+        val neu = draft.alsEintrag(id, statusId = alt.statusId, angelegt = alt.angelegt, tische = draft.tableIds)
         s.copy(reservierungen = s.reservierungen.map { if (it.id == id) neu else it }) to Unit
     }
 
@@ -101,17 +105,63 @@ class LokalBackend(
 
     // --- Stammdaten ---------------------------------------------------------------------
 
-    override suspend fun locations(): List<Location> = listOf(STANDORT)
+    override suspend fun locations(): List<Location> = lesen { listOf(standort(it)) }
 
-    override suspend fun tables(): List<DiningTable> = emptyList()
+    /** Nur die Tische; Raeume vergibt die Telefonannahme, wie in TastyIgniter. */
+    override suspend fun tables(): List<DiningTable> = lesen { s ->
+        s.stamm.tische.map { DiningTable(it.id, it.name, it.min, it.max) }.sortedBy { it.name }
+    }
+
+    suspend fun stammdaten(): LokalStammdaten = lesen { it.stamm }
+
+    suspend fun speichereStammdaten(stamm: LokalStammdaten) = aendern { s -> s.copy(stamm = stamm) to Unit }
 
     override suspend fun reservationStatuses(): List<ReservationStatus> = ReservationStatus.DEFAULTS
 
     // --- Funktionen der Server-Erweiterung ------------------------------------------------
 
-    override suspend fun internTag(datum: LocalDate, gaeste: Int, raumId: Long?): Tagesdaten = fehlt()
+    override suspend fun internTag(datum: LocalDate, gaeste: Int, raumId: Long?): Tagesdaten = lesen { s ->
+        rechnung(s).tag(datum, maxOf(1, gaeste), raumId, jetztHier)
+    }
 
-    override suspend fun internAnnehmen(entwurf: Annahmeentwurf): InternReservierung = fehlt()
+    /**
+     * Wie `POST intern/reservierung`: Nachname und Telefon genuegen, der Status ist
+     * gleich bestaetigt. Die Hoechstzahl wird hier geprueft und nicht in der
+     * Oberflaeche, und zwar innerhalb der Sperre - zwei schnelle Klicks hintereinander
+     * sehen so nie dieselbe alte Belegung.
+     */
+    override suspend fun internAnnehmen(entwurf: Annahmeentwurf): InternReservierung = aendern { s ->
+        val fehler = buildMap {
+            if (entwurf.nachname.isBlank()) put("nachname", listOf("Bitte den Nachnamen eintragen."))
+            if (entwurf.telefon.isBlank()) put("telefon", listOf("Bitte die Telefonnummer eintragen."))
+            if (entwurf.gaeste !in 1..200) put("gaeste", listOf("Zwischen 1 und 200 Gäste."))
+        }
+        if (fehler.isNotEmpty()) throw ApiException(422, fehler.values.flatten().joinToString("\n"), fehler)
+
+        val rechnung = rechnung(s)
+        val zeit = entwurf.zeit.truncatedTo(ChronoUnit.MINUTES)
+        rechnung.hoechstzahlVerletzt(entwurf.datum, zeit, entwurf.gaeste)?.let {
+            throw ApiException(422, it, mapOf("gaeste" to listOf(it)))
+        }
+
+        val neu = LokalReservierung(
+            id = s.naechsteId,
+            datum = entwurf.datum.toString(),
+            zeit = zeit.format(HHMM),
+            gaeste = entwurf.gaeste,
+            dauer = s.stamm.aufenthaltMinuten,
+            // Am Telefon wird nur der Nachname erfragt.
+            nachname = entwurf.nachname.trim(),
+            email = entwurf.email.trim(),
+            telefon = entwurf.telefon.trim(),
+            kommentar = entwurf.notiz.trim(),
+            statusId = LokalRechnung.BESTAETIGT,
+            angelegt = jetzt().toString(),
+            tische = rechnung.tischeFuerAnnahme(entwurf.copy(zeit = zeit)),
+        )
+        val danach = s.copy(naechsteId = neu.id + 1, reservierungen = s.reservierungen + neu)
+        danach to rechnung(danach).alsIntern(neu)
+    }
 
     override suspend fun internTagesblatt(von: LocalDate, bis: LocalDate, trennzeit: String?): Tagesblatt = fehlt()
 
@@ -133,9 +183,29 @@ class LokalBackend(
         )
     }
 
-    override suspend fun internSperren(datum: LocalDate, grund: String): Map<String, String> = fehlt()
+    /**
+     * Ohne Website gibt es keine Online-Buchung zu sperren: ein gesperrter Tag ist
+     * hier geschlossen, die Annahme bietet keine Zeit mehr an.
+     */
+    override suspend fun internSperren(datum: LocalDate, grund: String): Map<String, String> = aendern { s ->
+        val neu = s.copy(sperrtage = vergangeneWeg(s.sperrtage + (datum.toString() to grund.trim())))
+        neu to neu.sperrtage
+    }
 
-    override suspend fun internFreigeben(datum: LocalDate): Map<String, String> = fehlt()
+    override suspend fun internFreigeben(datum: LocalDate): Map<String, String> = aendern { s ->
+        val neu = s.copy(sperrtage = vergangeneWeg(s.sperrtage - datum.toString()))
+        neu to neu.sperrtage
+    }
+
+    /** Wie auf dem Server: Vergangenes faellt heraus, sonst waechst die Liste ohne Ende. */
+    private fun vergangeneWeg(tage: Map<String, String>): Map<String, String> {
+        val heute = jetztHier.toLocalDate().toString()
+        return tage.filterKeys { it >= heute }.toSortedMap()
+    }
+
+    private fun rechnung(s: LokalStand) = LokalRechnung(s.stamm, s.reservierungen, s.sperrtage)
+
+    private fun standort(s: LokalStand) = Location(STANDORT.id, s.stamm.name.ifBlank { STANDORT.name })
 
     private fun fehlt(): Nothing =
         throw ApiException(404, "Im lokalen Betrieb noch nicht verfügbar.")
@@ -200,7 +270,7 @@ class LokalBackend(
         }
     }
 
-    private fun ReservationDraft.alsEintrag(id: Long, statusId: Long, angelegt: String?) = LokalReservierung(
+    private fun ReservationDraft.alsEintrag(id: Long, statusId: Long, angelegt: String?, tische: List<Long>) = LokalReservierung(
         id = id,
         datum = date.toString(),
         zeit = time.truncatedTo(ChronoUnit.MINUTES).format(HHMM),
@@ -213,16 +283,22 @@ class LokalBackend(
         kommentar = comment.trim(),
         statusId = statusId,
         angelegt = angelegt,
+        tische = tische,
     )
 
-    private fun LokalReservierung.alsReservierung(): Reservation {
+    private fun LokalReservierung.alsReservierung(s: LokalStand): Reservation {
         val tag = runCatching { LocalDate.parse(datum) }.getOrNull()
         val uhr = runCatching { LocalTime.parse(zeit) }.getOrNull()
         val status = ReservationStatus.DEFAULTS.firstOrNull { it.id == statusId }
+        val ort = standort(s)
+        val belegt = tische.mapNotNull { t ->
+            s.stamm.tische.firstOrNull { it.id == t }?.let { DiningTable(it.id, it.name, it.min, it.max) }
+                ?: s.stamm.raeume.firstOrNull { it.id == t }?.let { DiningTable(it.id, it.name, it.min, it.max) }
+        }
         return Reservation(
             id = id,
-            locationId = STANDORT.id,
-            locationName = STANDORT.name,
+            locationId = ort.id,
+            locationName = ort.name,
             locationAddress = null,
             guestNum = gaeste,
             firstName = vorname,
@@ -237,8 +313,8 @@ class LokalBackend(
             statusId = statusId,
             statusName = status?.name,
             statusColor = status?.color,
-            tables = emptyList(),
-            tableNames = null,
+            tables = belegt,
+            tableNames = belegt.joinToString(", ") { it.name }.ifEmpty { null },
             // Die Detailansicht zeigt die ersten 16 Zeichen, also Datum und Uhrzeit.
             createdAt = angelegt?.let { a ->
                 runCatching { LocalDateTime.ofInstant(Instant.parse(a), zone).toString() }.getOrNull()
@@ -271,6 +347,9 @@ internal data class LokalStand(
     val version: Int = 1,
     val naechsteId: Long = 1,
     val reservierungen: List<LokalReservierung> = emptyList(),
+    val stamm: LokalStammdaten = LokalStammdaten(),
+    /** Datum (ISO) auf Grund. */
+    val sperrtage: Map<String, String> = emptyMap(),
 )
 
 @Serializable
@@ -288,4 +367,6 @@ internal data class LokalReservierung(
     val statusId: Long,
     /** Zeitpunkt als ISO-Instant; null bei Eintraegen, die jemand von Hand angelegt hat. */
     val angelegt: String? = null,
+    /** Tische und Raeume, siehe [LokalStammdaten]. */
+    val tische: List<Long> = emptyList(),
 )

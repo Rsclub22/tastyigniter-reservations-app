@@ -142,7 +142,7 @@ class LokalBackendTest {
     @Test
     fun `noch fehlende Funktionen melden sich verstaendlich`() = runTest {
         try {
-            backend().internTag(tag, 2)
+            backend().internMonat(2026, 11)
             fail("erwartet: ApiException")
         } catch (e: ApiException) {
             assertTrue(e.message.contains("lokalen Betrieb"))

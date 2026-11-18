@@ -25,6 +25,7 @@ import io.github.rsclub22.tireservations.ui.detail.ReservationDetailScreen
 import io.github.rsclub22.tireservations.ui.edit.ReservationEditScreen
 import io.github.rsclub22.tireservations.ui.list.ReservationListScreen
 import io.github.rsclub22.tireservations.ui.login.LoginScreen
+import io.github.rsclub22.tireservations.ui.settings.LokalStammdatenScreen
 import io.github.rsclub22.tireservations.ui.settings.SettingsScreen
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -39,6 +40,7 @@ private object Routes {
     const val MONAT = "monat"
     const val BLATT = "blatt"
     const val SETTINGS = "settings"
+    const val LOKAL = "lokal"
 
     fun detail(id: Long) = "detail/$id"
     fun annahme(datum: LocalDate? = null) = "annahme?datum=${datum ?: ""}"
@@ -174,10 +176,14 @@ private fun AppNavHost(
                 updateChecker = updateChecker,
                 versionLabel = versionLabel,
                 onBack = { nav.popBackStack() },
+                onLokal = { nav.navigate(Routes.LOKAL) },
                 onLoggedOut = {
                     nav.navigate(Routes.LOGIN) { popUpTo(nav.graph.id) { inclusive = true } }
                 },
             )
+        }
+        composable(Routes.LOKAL) {
+            LokalStammdatenScreen(repository = repository, onBack = { nav.popBackStack() })
         }
     }
 }

@@ -53,6 +53,16 @@ class ReservationRepository(
         clearCache()
     }
 
+    // --- Lokaler Betrieb ------------------------------------------------------------------
+
+    suspend fun lokalStammdaten(): LokalStammdaten = lokal.stammdaten()
+
+    /** Leert danach den Zwischenspeicher, sonst bietet das Formular die alten Tische an. */
+    suspend fun speichereLokalStammdaten(stamm: LokalStammdaten) {
+        lokal.speichereStammdaten(stamm)
+        clearCache()
+    }
+
     suspend fun logout() {
         settingsStore.logout()
         clearCache()
