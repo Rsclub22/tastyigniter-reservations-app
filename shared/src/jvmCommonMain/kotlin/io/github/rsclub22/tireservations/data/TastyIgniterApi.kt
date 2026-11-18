@@ -32,7 +32,7 @@ class TastyIgniterApi(
     private val client: OkHttpClient,
     val baseUrl: String,
     private val token: String?,
-) {
+) : Backend {
     private val json = Json { ignoreUnknownKeys = true }
 
     /** Die Telefonannahme erwartet HH:MM, nicht HH:MM:SS. */
@@ -77,7 +77,9 @@ class TastyIgniterApi(
      *
      * @param maxPages only limits search results (no date); day views always cover the whole day.
      */
-    suspend fun reservations(query: ReservationQuery, pageLimit: Int = 100, maxPages: Int = 50): ReservationList {
+    override suspend fun reservations(query: ReservationQuery): ReservationList = reservations(query, 100, 50)
+
+    suspend fun reservations(query: ReservationQuery, pageLimit: Int, maxPages: Int = 50): ReservationList {
         var statusMissing = false
         val result = mutableListOf<Reservation>()
         val date = query.date
@@ -165,7 +167,7 @@ class TastyIgniterApi(
             }
         }
 
-    suspend fun reservation(id: Long): LoadedReservation {
+    override suspend fun reservation(id: Long): LoadedReservation {
         val url = url("reservations/$id").newBuilder()
             .addQueryParameter("include", "status,tables,location")
             .build()
@@ -175,21 +177,21 @@ class TastyIgniterApi(
         return LoadedReservation(Mappers.reservation(doc, res), statusMissing)
     }
 
-    suspend fun createReservation(draft: ReservationDraft): Long {
+    override suspend fun createReservation(draft: ReservationDraft): Long {
         val doc = document(send("POST", url("reservations"), draft.toJson(isUpdate = false)))
         val res = doc.data.firstOrNull() ?: throw ApiException(0, "Unerwartete Antwort vom Server.")
         return Mappers.reservation(doc, res).id
     }
 
-    suspend fun updateReservation(id: Long, draft: ReservationDraft) {
+    override suspend fun updateReservation(id: Long, draft: ReservationDraft) {
         send("PATCH", url("reservations/$id"), draft.toJson(isUpdate = true))
     }
 
-    suspend fun deleteReservation(id: Long) {
+    override suspend fun deleteReservation(id: Long) {
         send("DELETE", url("reservations/$id"))
     }
 
-    suspend fun updateStatus(id: Long, statusId: Long, comment: String?, notify: Boolean) {
+    override suspend fun updateStatus(id: Long, statusId: Long, comment: String?, notify: Boolean) {
         val body = buildJsonObject {
             put("status_id", statusId)
             if (!comment.isNullOrBlank()) put("comment", comment)
@@ -200,13 +202,13 @@ class TastyIgniterApi(
 
     // --- Lookups --------------------------------------------------------------------------
 
-    suspend fun locations(): List<Location> =
+    override suspend fun locations(): List<Location> =
         list("locations").map { Mappers.location(it) }
 
-    suspend fun tables(): List<DiningTable> =
+    override suspend fun tables(): List<DiningTable> =
         list("tables").map { Mappers.table(it) }.filter { it.enabled }.sortedBy { it.name }
 
-    suspend fun reservationStatuses(): List<ReservationStatus> =
+    override suspend fun reservationStatuses(): List<ReservationStatus> =
         list("status").filter { Mappers.isReservationStatus(it) }.map { Mappers.status(it) }
 
     private suspend fun list(path: String): List<Resource> {
@@ -233,7 +235,7 @@ class TastyIgniterApi(
     // ein per Anmeldung erzeugtes Token hat "*" und damit auch diese.
 
     /** Alles, was die Annahme für einen Tag braucht. */
-    suspend fun internTag(datum: LocalDate, gaeste: Int, raumId: Long? = null): Tagesdaten {
+    override suspend fun internTag(datum: LocalDate, gaeste: Int, raumId: Long?): Tagesdaten {
         val url = url("intern/tag").newBuilder()
             .addQueryParameter("datum", datum.toString())
             .addQueryParameter("gaeste", gaeste.toString())
@@ -251,7 +253,7 @@ class TastyIgniterApi(
      * direkt am Eingabefeld. Die Prüfung läuft dort und nicht hier, damit ein zweites
      * Gerät sie nicht mit einer veralteten Belegung umgehen kann.
      */
-    suspend fun internAnnehmen(entwurf: Annahmeentwurf): InternReservierung {
+    override suspend fun internAnnehmen(entwurf: Annahmeentwurf): InternReservierung {
         val body = buildJsonObject {
             put("datum", entwurf.datum.toString())
             put("zeit", entwurf.zeit.format(HHMM))
@@ -283,7 +285,7 @@ class TastyIgniterApi(
      * @param trennzeit `HH:MM`, oder `"aus"` für ein einziges Blatt; `null` nimmt die
      *   Vorgabe des Servers.
      */
-    suspend fun internTagesblatt(von: LocalDate, bis: LocalDate = von, trennzeit: String? = null): Tagesblatt {
+    override suspend fun internTagesblatt(von: LocalDate, bis: LocalDate, trennzeit: String?): Tagesblatt {
         val url = url("intern/tagesblatt").newBuilder()
             .addQueryParameter("von", von.toString())
             .addQueryParameter("bis", bis.toString())
@@ -294,7 +296,7 @@ class TastyIgniterApi(
     }
 
     /** Der Monat auf einen Blick: je Tag nur Summen, keine Zeitfenster. */
-    suspend fun internMonat(jahr: Int, monat: Int): Monatsuebersicht {
+    override suspend fun internMonat(jahr: Int, monat: Int): Monatsuebersicht {
         val url = url("intern/monat").newBuilder()
             .addQueryParameter("jahr", jahr.toString())
             .addQueryParameter("monat", monat.toString())
@@ -310,7 +312,7 @@ class TastyIgniterApi(
      *   created_at auf das Datum, nach der Zeit liesse sich "neu seit zuletzt" nicht
      *   beantworten.
      */
-    suspend fun internOffen(seit: Long): OffeneReservierungen {
+    override suspend fun internOffen(seit: Long): OffeneReservierungen {
         val url = url("intern/offen").newBuilder()
             .addQueryParameter("seit", seit.toString())
             .build()
@@ -319,7 +321,7 @@ class TastyIgniterApi(
     }
 
     /** Einen Tag gegen die Online-Buchung sperren. Gibt die neue Liste zurück. */
-    suspend fun internSperren(datum: LocalDate, grund: String = ""): Map<String, String> {
+    override suspend fun internSperren(datum: LocalDate, grund: String): Map<String, String> {
         val body = buildJsonObject {
             put("datum", datum.toString())
             grund.trim().takeIf { it.isNotEmpty() }?.let { put("grund", it) }
@@ -329,7 +331,7 @@ class TastyIgniterApi(
     }
 
     /** Sperre aufheben. Gibt die neue Liste zurück. */
-    suspend fun internFreigeben(datum: LocalDate): Map<String, String> {
+    override suspend fun internFreigeben(datum: LocalDate): Map<String, String> {
         val body = buildJsonObject { put("datum", datum.toString()) }
 
         return sperrliste(objekt(send("DELETE", url("intern/sperrtage"), body)))

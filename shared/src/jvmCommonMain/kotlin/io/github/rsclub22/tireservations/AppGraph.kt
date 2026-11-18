@@ -1,12 +1,15 @@
 package io.github.rsclub22.tireservations
 
+import io.github.rsclub22.tireservations.data.LokalBackend
 import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.data.UpdateChecker
 import io.github.rsclub22.tireservations.data.Wachdienst
 import io.github.rsclub22.tireservations.data.createSettingsDataStore
+import io.github.rsclub22.tireservations.platform.settingsFilePath
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
@@ -87,7 +90,9 @@ object AppGraph {
             .build()
 
         settingsStore = SettingsStore(createSettingsDataStore { einstellungenVerloren = true })
-        repository = ReservationRepository(settingsStore, httpClient)
+        // Neben die Einstellungen, damit beides am selben, je Plattform bekannten Ort liegt.
+        val lokaleDatei = File(settingsFilePath()).resolveSibling(LokalBackend.DATEINAME)
+        repository = ReservationRepository(settingsStore, httpClient, LokalBackend(lokaleDatei))
         wachdienst = Wachdienst(repository, settingsStore)
         updateChecker = UpdateChecker(
             httpClient,

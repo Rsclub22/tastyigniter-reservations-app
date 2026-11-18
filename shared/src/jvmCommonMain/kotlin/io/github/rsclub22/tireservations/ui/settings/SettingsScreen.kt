@@ -84,16 +84,24 @@ fun SettingsScreen(
         },
     ) { padding ->
         Column(Modifier.padding(padding).fillMaxSize().senkrechtSchiebbar()) {
-            ListItem(
-                headlineContent = { Text(settings.userName ?: settings.email) },
-                supportingContent = { Text(if (settings.isAdmin) "Mitarbeiter · ${settings.email}" else "Kunde · ${settings.email}") },
-                leadingContent = { Icon(Icons.Outlined.Person, contentDescription = null) },
-            )
-            ListItem(
-                headlineContent = { Text("Server") },
-                supportingContent = { Text(settings.baseUrl) },
-                leadingContent = { Icon(Icons.Outlined.Dns, contentDescription = null) },
-            )
+            if (settings.lokal) {
+                ListItem(
+                    headlineContent = { Text("Ohne Server") },
+                    supportingContent = { Text("Die Reservierungen liegen nur auf diesem Gerät.") },
+                    leadingContent = { Icon(Icons.Outlined.Dns, contentDescription = null) },
+                )
+            } else {
+                ListItem(
+                    headlineContent = { Text(settings.userName ?: settings.email) },
+                    supportingContent = { Text(if (settings.isAdmin) "Mitarbeiter · ${settings.email}" else "Kunde · ${settings.email}") },
+                    leadingContent = { Icon(Icons.Outlined.Person, contentDescription = null) },
+                )
+                ListItem(
+                    headlineContent = { Text("Server") },
+                    supportingContent = { Text(settings.baseUrl) },
+                    leadingContent = { Icon(Icons.Outlined.Dns, contentDescription = null) },
+                )
+            }
             HorizontalDivider()
 
             if (locations.size > 1) {
@@ -118,7 +126,8 @@ fun SettingsScreen(
             }
 
             // Stammdaten bekommt nur das Haus; dem Gast verweigert sie der Server.
-            if (settings.isAdmin) ListItem(
+            // Lokal gibt es nichts nachzuladen.
+            if (settings.isAdmin && !settings.lokal) ListItem(
                 headlineContent = { Text("Stammdaten neu laden") },
                 supportingContent = {
                     Text(if (cacheCleared) "Erledigt – Standorte, Tische und Status werden neu geladen." else "Standorte, Tische und Status vom Server abrufen")
@@ -130,7 +139,10 @@ fun SettingsScreen(
                 },
             )
             ListItem(
-                headlineContent = { Text("Abmelden", color = MaterialTheme.colorScheme.error) },
+                // Die lokale Datei bleibt dabei liegen; "Abmelden" klaenge nach Loeschen.
+                headlineContent = {
+                    Text(if (settings.lokal) "Zur Anmeldung am Server" else "Abmelden", color = MaterialTheme.colorScheme.error)
+                },
                 leadingContent = {
                     Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = null, tint = MaterialTheme.colorScheme.error)
                 },

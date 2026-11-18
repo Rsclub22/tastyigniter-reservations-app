@@ -1,6 +1,7 @@
 package io.github.rsclub22.tireservations.ui.list
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import io.github.rsclub22.tireservations.data.LokalBackend
 import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.SettingsStore
 import io.github.rsclub22.tireservations.ui.detail.DetailState
@@ -105,7 +106,8 @@ class StatusHinweisTest {
         runBlocking {
             einstellungen.saveLogin(server.url("/api").toString().trimEnd('/'), "a@b.de", true, "tok", null)
         }
-        return bau(ReservationRepository(einstellungen, OkHttpClient()), einstellungen)
+        val lokal = LokalBackend(ordner.root.resolve("lokal.json"))
+        return bau(ReservationRepository(einstellungen, OkHttpClient(), lokal), einstellungen)
     }
 
     @Test

@@ -24,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -103,6 +104,18 @@ class LoginViewModel(
                     onSuccess()
                 }
                 .onFailure { e -> _state.update { it.copy(loading = false, error = e.message ?: "Anmeldung fehlgeschlagen.") } }
+        }
+    }
+
+    fun lokal(onSuccess: () -> Unit) {
+        _state.update { it.copy(loading = true, error = null) }
+        viewModelScope.launch {
+            runCatching { repository.startLokal() }
+                .onSuccess {
+                    _state.update { it.copy(loading = false, password = "") }
+                    onSuccess()
+                }
+                .onFailure { e -> _state.update { it.copy(loading = false, error = e.message ?: "Lokaler Betrieb ließ sich nicht starten.") } }
         }
     }
 }
@@ -229,6 +242,21 @@ fun LoginScreen(
                     Text("Anmelden")
                 }
             }
+
+            OutlinedButton(
+                onClick = { vm.lokal(onLoggedIn) },
+                enabled = !state.loading,
+                modifier = fieldModifier.height(48.dp),
+            ) {
+                Text("Ohne Server arbeiten")
+            }
+            Text(
+                "Die Reservierungen liegen dann nur auf diesem Gerät. " +
+                    "Andere Geräte und die Website sehen sie nicht.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = fieldModifier,
+            )
         }
     }
 }
