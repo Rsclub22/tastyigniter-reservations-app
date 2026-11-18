@@ -34,8 +34,8 @@ data class AnnahmeState(
     val speichern: Boolean = false,
     val fehler: String? = null,
     val feldFehler: Map<String, List<String>> = emptyMap(),
-    /** Die zuletzt angenommene Reservierung - bleibt stehen, bis der naechste Anruf beginnt. */
-    val angelegt: InternReservierung? = null,
+    /** Gerade angenommen: dafuer steht kurz die Bestaetigung ueber dem ganzen Schirm. */
+    val bestaetigung: InternReservierung? = null,
     val unauthorized: Boolean = false,
 ) {
     val bereit: Boolean
@@ -121,14 +121,13 @@ class TelefonannahmeViewModel(
 
     fun neuLaden() = ladeTag()
 
+    fun bestaetigungGesehen() = _state.update { it.copy(bestaetigung = null) }
+
     fun fehlerGesehen() = _state.update { it.copy(fehler = null) }
 
-    /** Bestaetigung wegraeumen und fuer den naechsten Anruf freimachen. */
+    /** Fuer den naechsten Anruf freimachen; der Tag und die Gaestezahl bleiben stehen. */
     fun weiter() = _state.update {
-        it.copy(
-            angelegt = null, nachname = "", telefon = "", email = "", notiz = "",
-            zeit = null, feldFehler = emptyMap(),
-        )
+        it.copy(nachname = "", telefon = "", email = "", notiz = "", zeit = null, feldFehler = emptyMap())
     }
 
     /**
@@ -236,7 +235,7 @@ class TelefonannahmeViewModel(
                         ohneTisch = s.ohneTisch,
                     ),
                 )
-                _state.update { it.copy(speichern = false, angelegt = angelegt) }
+                _state.update { it.copy(speichern = false, bestaetigung = angelegt) }
                 // Den Tag neu holen: die eigene Annahme veraendert die Belegung, und am
                 // Telefon wird gleich die naechste eingetragen.
                 ladeTag()

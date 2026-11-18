@@ -10,24 +10,27 @@ import java.time.LocalDate
 /**
  * Single entry point for the UI. Builds an API client from the stored settings and caches
  * lookup data (locations, tables, statuses) which rarely change.
+ *
+ * Im lokalen Betrieb antwortet statt des Servers [lokal]; die Oberflaeche merkt davon nichts.
  */
 class ReservationRepository(
     private val settingsStore: SettingsStore,
     private val httpClient: OkHttpClient,
+    private val lokal: LokalBackend,
 ) {
     private val mutex = Mutex()
-    private var cachedApi: TastyIgniterApi? = null
-    private var cachedKey: Pair<String, String?>? = null
+    private var cachedApi: Backend? = null
+    private var cachedKey: Triple<Boolean, String, String?>? = null
 
     private var locations: List<Location>? = null
     private var tables: List<DiningTable>? = null
     private var statuses: List<ReservationStatus>? = null
 
-    private suspend fun api(): TastyIgniterApi = mutex.withLock {
+    private suspend fun api(): Backend = mutex.withLock {
         val s = settingsStore.settings.first()
-        val key = s.baseUrl to s.token
+        val key = Triple(s.lokal, s.baseUrl, s.token)
         if (cachedApi == null || cachedKey != key) {
-            cachedApi = TastyIgniterApi(httpClient, s.baseUrl, s.token)
+            cachedApi = if (s.lokal) lokal else TastyIgniterApi(httpClient, s.baseUrl, s.token)
             cachedKey = key
             clearCache()
         }
@@ -41,6 +44,22 @@ class ReservationRepository(
             .createToken(email.trim(), password, isAdmin, tokenName)
         val userName = runCatching { TastyIgniterApi(httpClient, baseUrl, token).currentUserName() }.getOrNull()
         settingsStore.saveLogin(baseUrl, email.trim(), isAdmin, token, userName)
+        clearCache()
+    }
+
+    /** Betrieb ohne Server; die lokale Datei bleibt ueber An- und Abmelden hinweg erhalten. */
+    suspend fun startLokal() {
+        settingsStore.startLokal()
+        clearCache()
+    }
+
+    // --- Lokaler Betrieb ------------------------------------------------------------------
+
+    suspend fun lokalStammdaten(): LokalStammdaten = lokal.stammdaten()
+
+    /** Leert danach den Zwischenspeicher, sonst bietet das Formular die alten Tische an. */
+    suspend fun speichereLokalStammdaten(stamm: LokalStammdaten) {
+        lokal.speichereStammdaten(stamm)
         clearCache()
     }
 

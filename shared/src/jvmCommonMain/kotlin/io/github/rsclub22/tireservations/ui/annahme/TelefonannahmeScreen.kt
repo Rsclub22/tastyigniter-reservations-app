@@ -1,6 +1,7 @@
 package io.github.rsclub22.tireservations.ui.annahme
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Refresh
@@ -69,6 +72,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.rsclub22.tireservations.data.InternReservierung
 import io.github.rsclub22.tireservations.data.ReservationRepository
 import io.github.rsclub22.tireservations.data.Tagesdaten
 import io.github.rsclub22.tireservations.data.Zeitfenster
@@ -76,6 +80,7 @@ import io.github.rsclub22.tireservations.ui.components.ErrorCard
 import io.github.rsclub22.tireservations.ui.components.LoadingBox
 import io.github.rsclub22.tireservations.ui.components.display
 import io.github.rsclub22.tireservations.ui.components.senkrechtSchiebbar
+import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -100,6 +105,12 @@ fun TelefonannahmeScreen(
     onBack: () -> Unit,
     onUnauthorized: () -> Unit,
     startdatum: LocalDate = LocalDate.now(),
+    /**
+     * Nach dem Annehmen zurueck statt stehenbleiben. Wer ueber "Neu" kam, wollte
+     * genau eine Reservierung eintragen; wer die Annahme ueber das Menue geoeffnet
+     * hat, sitzt am Telefon und nimmt gleich den naechsten Anruf an.
+     */
+    nachAnnahmeZurueck: Boolean = false,
 ) {
     // Der Schluessel haengt am Startdatum: kommt man aus dem Monatskalender mit
     // einem anderen Tag herein, soll der Schirm dort stehen und nicht den
@@ -111,6 +122,21 @@ fun TelefonannahmeScreen(
     var kalender by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.unauthorized) { if (state.unauthorized) onUnauthorized() }
+
+    // Kurz und unuebersehbar: am Telefon schaut man auf den Gast, nicht auf eine
+    // Karte unten im Schirm. Lang genug zum Lesen, kurz genug, um nicht zu warten.
+    // Wer bleibt, nimmt gleich den naechsten Anruf an: die Felder sind dann leer,
+    // ohne dass erst jemand "Naechster Anruf" tippen muss.
+    val fertig: () -> Unit = {
+        vm.bestaetigungGesehen()
+        if (nachAnnahmeZurueck) onBack() else vm.weiter()
+    }
+    state.bestaetigung?.let { angenommen ->
+        LaunchedEffect(angenommen.id) {
+            delay(BESTAETIGUNG_MS)
+            fertig()
+        }
+    }
 
     if (kalender) {
         val zustand = rememberDatePickerState(
@@ -130,52 +156,55 @@ fun TelefonannahmeScreen(
         ) { DatePicker(state = zustand) }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Telefonannahme") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = vm::neuLaden) {
-                        Icon(Icons.Outlined.Refresh, contentDescription = "Neu laden")
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
-            // Am Telefon stehen die Gastfelder untereinander, auf dem Desktop
-            // nebeneinander wie auf der Weboberflaeche.
-            val breit = maxWidth >= 720.dp
+    Box(Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Telefonannahme") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Zurück")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = vm::neuLaden) {
+                            Icon(Icons.Outlined.Refresh, contentDescription = "Neu laden")
+                        }
+                    },
+                )
+            },
+        ) { padding ->
+            BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
+                // Am Telefon stehen die Gastfelder untereinander, auf dem Desktop
+                // nebeneinander wie auf der Weboberflaeche.
+                val breit = maxWidth >= 720.dp
 
-            Column(
-                Modifier.fillMaxSize().imePadding().senkrechtSchiebbar().padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                state.fehler?.let { ErrorCard(it, onRetry = vm::neuLaden) }
+                Column(
+                    Modifier.fillMaxSize().imePadding().senkrechtSchiebbar().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    state.fehler?.let { ErrorCard(it, onRetry = vm::neuLaden) }
 
-                TagKarte(state, vm, breit) { kalender = true }
+                    TagKarte(state, vm, breit) { kalender = true }
 
-                val tag = state.tag
-                when {
-                    state.laden && tag == null -> LoadingBox()
-                    tag != null -> {
-                        // Der Gast steht vor der Belegung, auf jedem Geraet und
-                        // auf /intern gleich. Der Grund ist der Ablauf: Name und
-                        // Nummer werden getippt, waehrend der Gast redet, und der
-                        // Klick auf die Uhrzeit nimmt an. Stehen die Zeiten oben,
-                        // muss man zum Abschliessen wieder hoch - auch auf dem
-                        // breiten Schirm, das hat sich am Tresen gezeigt.
-                        GastKarte(state, vm, breit)
-                        BelegungKarte(state, tag, vm, breit)
+                    val tag = state.tag
+                    when {
+                        state.laden && tag == null -> LoadingBox()
+                        tag != null -> {
+                            // Der Gast steht vor der Belegung, auf jedem Geraet und
+                            // auf /intern gleich. Der Grund ist der Ablauf: Name und
+                            // Nummer werden getippt, waehrend der Gast redet, und der
+                            // Klick auf die Uhrzeit nimmt an. Stehen die Zeiten oben,
+                            // muss man zum Abschliessen wieder hoch - auch auf dem
+                            // breiten Schirm, das hat sich am Tresen gezeigt.
+                            GastKarte(state, vm, breit)
+                            BelegungKarte(state, tag, vm, breit)
+                        }
                     }
                 }
             }
         }
+        state.bestaetigung?.let { Bestaetigung(it, onTippen = fertig) }
     }
 }
 
@@ -653,28 +682,6 @@ private fun GastKarte(state: AnnahmeState, vm: TelefonannahmeViewModel, breit: B
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-
-        state.angelegt?.let { angelegt ->
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                ),
-            ) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "Angenommen",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        "#${angelegt.id} · ${angelegt.zeit.display()} Uhr · ${angelegt.gaeste} Personen · " +
-                            "${angelegt.name} · ${angelegt.tischeText}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    OutlinedButton(onClick = vm::weiter) { Text("Nächster Anruf") }
-                }
-            }
-        }
     }
 }
 
@@ -720,6 +727,55 @@ private fun schnellwahl(heute: LocalDate): List<Pair<LocalDate, String>> = listO
     heute to "Heute",
     heute.plusDays(1) to "Morgen",
 ) + (2L..4L).map { heute.plusDays(it) to heute.plusDays(it).format(KURZ) }
+
+/** Wie lange die Bestaetigung steht. */
+private const val BESTAETIGUNG_MS = 1_300L
+
+/** Ueber dem ganzen Schirm; ein Tippen schliesst sie gleich. */
+@Composable
+private fun Bestaetigung(r: InternReservierung, onTippen: () -> Unit) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .clickable(onClick = onTippen),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier.padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                Icons.Filled.CheckCircle,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(96.dp),
+            )
+            Text(
+                "Reservierung angenommen",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                listOfNotNull(
+                    r.datum?.format(LANG),
+                    r.zeit?.let { "${it.display()} Uhr" },
+                ).joinToString(" · "),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                "${r.name} · ${r.gaeste} Personen · ${r.tischeText}",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
 
 private val KURZ = DateTimeFormatter.ofPattern("EE d.M.", Locale.GERMAN)
 private val LANG = DateTimeFormatter.ofPattern("EEEE, d. MMMM", Locale.GERMAN)

@@ -24,6 +24,15 @@ eigener Server benötigt.
   E-Mail-Benachrichtigung an den Gast
 - Gast direkt **anrufen** oder **per E-Mail** kontaktieren
 - Standard-Standort für Betriebe mit mehreren Filialen
+- **Ohne Server arbeiten**: Auf dem Anmeldeschirm lässt sich die App ganz ohne TastyIgniter
+  betreiben. Die Reservierungen liegen dann in `lokal-reservierungen.json` neben den
+  Einstellungen, nur auf diesem Gerät, ohne Abgleich mit anderen Geräten oder der Website.
+  Öffnungszeiten, Tische, zusammengestellte Tische und Räume stehen in den Einstellungen.
+  Telefonannahme, Sperrtage, Tagesblatt und Monatsübersicht rechnen wie die Erweiterung
+  `reservationcontrol` auf dem Server; von den Stichwörtern der Sperrvermerke gelten
+  `ganztägig`, `max N PAX` und Uhrzeiten, die Online-Stichwörter haben ohne Website keine Wirkung.
+- Nach einer **Annahme am Telefon** steht kurz eine Bestätigung über dem Schirm. Über „Neu“
+  geht es danach zurück zur Liste, sonst bleibt die Annahme mit leeren Feldern offen.
 - Update-Hinweis bei neuen GitHub-Releases; am Telefon gegen die APK im Release, auf dem
   Desktop gegen das .deb-Paket. Kommt die App aus dem Play Store, verweisen die
   Einstellungen stattdessen auf die Store-Seite

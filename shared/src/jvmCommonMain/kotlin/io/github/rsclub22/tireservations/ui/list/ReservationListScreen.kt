@@ -111,6 +111,8 @@ fun ReservationListScreen(
     onOpen: (Long) -> Unit,
     onCreate: (LocalDate) -> Unit,
     onAnnahme: () -> Unit,
+    /** Ueber "Neu": nach dem Annehmen zurueck zur Liste. */
+    onSchnellAnnahme: () -> Unit,
     onMonat: () -> Unit,
     onBlatt: () -> Unit,
     onSettings: () -> Unit,
@@ -266,7 +268,7 @@ fun ReservationListScreen(
                         },
                         onClick = {
                             plusMenue = false
-                            onAnnahme()
+                            onSchnellAnnahme()
                         },
                     )
                     DropdownMenuItem(

@@ -24,8 +24,10 @@ data class AppSettings(
      * das Datum kuerzt.
      */
     val letzteGesehene: Long = 0,
+    /** Betrieb ohne TastyIgniter, die Reservierungen liegen in einer Datei auf dem Geraet. */
+    val lokal: Boolean = false,
 ) {
-    val isLoggedIn: Boolean get() = !token.isNullOrBlank() && baseUrl.isNotBlank()
+    val isLoggedIn: Boolean get() = lokal || (!token.isNullOrBlank() && baseUrl.isNotBlank())
 }
 
 class SettingsStore(private val dataStore: DataStore<Preferences>) {
@@ -39,6 +41,7 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         val defaultLocation = longPreferencesKey("default_location")
         val skippedUpdate = stringPreferencesKey("skipped_update")
         val letzteGesehene = longPreferencesKey("letzte_gesehene")
+        val lokal = booleanPreferencesKey("lokal")
     }
 
     val settings: Flow<AppSettings> = dataStore.data.map { it.toSettings() }
@@ -52,7 +55,10 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         defaultLocationId = this[Keys.defaultLocation],
         skippedUpdateVersion = this[Keys.skippedUpdate],
         letzteGesehene = this[Keys.letzteGesehene] ?: 0,
-    )
+        lokal = this[Keys.lokal] ?: false,
+        // Im lokalen Betrieb ist niemand Kunde; ein gemerkter Kundenzugang vom
+        // Server darf dort nicht die Kundenansicht ausloesen.
+    ).let { if (it.lokal) it.copy(isAdmin = true) else it }
 
     suspend fun saveLogin(baseUrl: String, email: String, isAdmin: Boolean, token: String, userName: String?) {
         dataStore.edit {
@@ -61,6 +67,20 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
             it[Keys.isAdmin] = isAdmin
             it[Keys.token] = token
             if (userName != null) it[Keys.userName] = userName else it.remove(Keys.userName)
+            it.remove(Keys.lokal)
+        }
+    }
+
+    /**
+     * Schaltet auf den Betrieb ohne Server. Adresse und E-Mail bleiben stehen,
+     * damit der Rueckweg zum Server nicht mit Abtippen beginnt; das Token nicht,
+     * sonst waere man nach dem Beenden des lokalen Betriebs still wieder angemeldet.
+     */
+    suspend fun startLokal() {
+        dataStore.edit {
+            it[Keys.lokal] = true
+            it.remove(Keys.token)
+            it.remove(Keys.userName)
         }
     }
 
@@ -82,6 +102,7 @@ class SettingsStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit {
             it.remove(Keys.token)
             it.remove(Keys.userName)
+            it.remove(Keys.lokal)
         }
     }
 }
