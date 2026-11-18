@@ -36,14 +36,14 @@ private object Routes {
     const val LIST = "list"
     const val DETAIL = "detail/{id}"
     const val EDIT = "edit?id={id}&date={date}"
-    const val ANNAHME = "annahme?datum={datum}"
+    const val ANNAHME = "annahme?datum={datum}&zurueck={zurueck}"
     const val MONAT = "monat"
     const val BLATT = "blatt"
     const val SETTINGS = "settings"
     const val LOKAL = "lokal"
 
     fun detail(id: Long) = "detail/$id"
-    fun annahme(datum: LocalDate? = null) = "annahme?datum=${datum ?: ""}"
+    fun annahme(datum: LocalDate? = null, zurueck: Boolean = false) = "annahme?datum=${datum ?: ""}&zurueck=$zurueck"
     fun edit(id: Long? = null, date: LocalDate? = null) = "edit?id=${id ?: -1}&date=${date ?: ""}"
 }
 
@@ -98,6 +98,7 @@ private fun AppNavHost(
                 onOpen = { nav.navigate(Routes.detail(it)) },
                 onCreate = { nav.navigate(Routes.edit(date = it)) },
                 onAnnahme = { nav.navigate(Routes.annahme()) },
+                onSchnellAnnahme = { nav.navigate(Routes.annahme(zurueck = true)) },
                 onMonat = { nav.navigate(Routes.MONAT) },
                 onBlatt = { nav.navigate(Routes.BLATT) },
                 onSettings = { nav.navigate(Routes.SETTINGS) },
@@ -106,7 +107,10 @@ private fun AppNavHost(
         }
         composable(
             Routes.ANNAHME,
-            arguments = listOf(navArgument("datum") { type = NavType.StringType; defaultValue = "" }),
+            arguments = listOf(
+                navArgument("datum") { type = NavType.StringType; defaultValue = "" },
+                navArgument("zurueck") { type = NavType.BoolType; defaultValue = false },
+            ),
         ) { entry ->
             val datum = entry.arguments?.read { getStringOrNull("datum") }?.takeIf { it.isNotBlank() }
                 ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
@@ -115,6 +119,7 @@ private fun AppNavHost(
                 onBack = { nav.popBackStack() },
                 onUnauthorized = toLogin,
                 startdatum = datum ?: LocalDate.now(),
+                nachAnnahmeZurueck = entry.arguments?.read { getBooleanOrNull("zurueck") } ?: false,
             )
         }
         composable(Routes.BLATT) {

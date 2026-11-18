@@ -29,9 +29,7 @@ import java.time.temporal.ChronoUnit
  * Filter, Farben und Beschriftungen wie gewohnt. Tische, Raeume und
  * Oeffnungszeiten stehen in [LokalStammdaten] in derselben Datei.
  *
- * Telefonannahme und Sperrtage rechnet [LokalRechnung]. Tagesblatt und Monat
- * kommen in einem spaeteren Schritt; bis dahin melden sie sich wie ein Server,
- * der sie nicht kennt.
+ * Telefonannahme, Sperrtage, Tagesblatt und Monat rechnet [LokalRechnung].
  */
 class LokalBackend(
     private val datei: File,
@@ -163,9 +161,14 @@ class LokalBackend(
         danach to rechnung(danach).alsIntern(neu)
     }
 
-    override suspend fun internTagesblatt(von: LocalDate, bis: LocalDate, trennzeit: String?): Tagesblatt = fehlt()
+    override suspend fun internTagesblatt(von: LocalDate, bis: LocalDate, trennzeit: String?): Tagesblatt = lesen { s ->
+        rechnung(s).tagesblatt(von, bis, trennzeit)
+    }
 
-    override suspend fun internMonat(jahr: Int, monat: Int): Monatsuebersicht = fehlt()
+    override suspend fun internMonat(jahr: Int, monat: Int): Monatsuebersicht = lesen { s ->
+        if (monat !in 1..12 || jahr !in 2000..2100) throw ApiException(422, "Ungültiger Monat $monat/$jahr.")
+        rechnung(s).monat(jahr, monat)
+    }
 
     /**
      * Ohne Webformular kommt nichts von aussen herein; was das Haus selbst
@@ -206,9 +209,6 @@ class LokalBackend(
     private fun rechnung(s: LokalStand) = LokalRechnung(s.stamm, s.reservierungen, s.sperrtage)
 
     private fun standort(s: LokalStand) = Location(STANDORT.id, s.stamm.name.ifBlank { STANDORT.name })
-
-    private fun fehlt(): Nothing =
-        throw ApiException(404, "Im lokalen Betrieb noch nicht verfügbar.")
 
     // --- Speicher -------------------------------------------------------------------------
 

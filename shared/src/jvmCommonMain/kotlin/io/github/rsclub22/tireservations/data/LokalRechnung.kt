@@ -104,6 +104,94 @@ internal class LokalRechnung(
         )
     }
 
+    // --- Tagesblatt und Monat -------------------------------------------------------------
+
+    /**
+     * Was `GET intern/tagesblatt` liefert, wie `DailySheet`. Ein Zeitraum laesst
+     * leere Tage weg; ein Tag mit Sperrvermerk kommt mit, der Vermerk ist dann
+     * genau die Nachricht.
+     *
+     * @param trennzeit wie der Server: null fuer die eigene Vorgabe, "aus" fuer ein Blatt.
+     */
+    fun tagesblatt(von: LocalDate, bis: LocalDate, trennzeit: String?): Tagesblatt {
+        val teilung = teilung(trennzeit)
+        // Verdreht eingegeben: verstehen statt ablehnen.
+        val (anfang, ende0) = if (bis < von) bis to von else von to bis
+        val ende = minOf(ende0, anfang.plusDays(MAX_TAGE - 1))
+        val zeitraum = anfang != ende
+        val tage = generateSequence(anfang) { it.plusDays(1) }.takeWhile { it <= ende }
+            .map { blattTag(it, teilung) }
+            .filter { !zeitraum || it.blaetter.isNotEmpty() || it.sperrvermerke.isNotEmpty() }
+            .toList()
+        return Tagesblatt(anfang, ende, zeitraum, teilung, tage)
+    }
+
+    private fun blattTag(datum: LocalDate, teilung: LocalTime?): BlattTag {
+        // Anders als die Belegung mit allem, was nicht storniert ist: eine
+        // Reservierung, die niemand sieht, ist genau der Fall, den das Blatt
+        // verhindern soll.
+        val alleDesTages = alle.filter { it.datum == datum.toString() && it.statusId != STORNIERT }
+            .sortedWith(compareBy({ it.zeit }, { it.id }))
+        val (vermerkEintraege, gaeste) = alleDesTages.partition { istVermerk(it) }
+        val vermerke = vermerke(datum)
+        val oeffnung = stamm.oeffnung(datum.dayOfWeek)
+        return BlattTag(
+            datum = datum,
+            gesperrt = datum.toString() in sperrtage,
+            grund = sperrtage[datum.toString()].orEmpty(),
+            maxPax = LokalVermerke.maxPax(vermerke),
+            paxJeZeit = LokalVermerke.maxPaxJeZeit(vermerke).mapKeys { (z, _) -> z.toString() },
+            sperrvermerke = vermerkEintraege.mapNotNull { r ->
+                vermerke.firstOrNull { it.id == r.id }?.let { v ->
+                    Sperrvermerk(v.id, v.zeit, r.gaeste, v.kommentar, LokalVermerke.ganztags(v, oeffnung))
+                }
+            },
+            blaetter = blaetter(gaeste, teilung),
+        )
+    }
+
+    private fun blaetter(gaeste: List<LokalReservierung>, teilung: LocalTime?): List<Blatt> {
+        fun blatt(titel: String, r: List<LokalReservierung>) = Blatt(titel, r.sumOf { it.gaeste }, r.map(::alsIntern))
+        if (teilung == null) return if (gaeste.isEmpty()) emptyList() else listOf(blatt("Ganzer Tag", gaeste))
+        val (vorher, nachher) = gaeste.partition { (LokalStammdaten.zeitOderNull(it.zeit) ?: LocalTime.MIDNIGHT) < teilung }
+        val z = teilung.toString()
+        return listOf(blatt("Bis $z Uhr", vorher), blatt("Ab $z Uhr", nachher)).filter { it.reservierungen.isNotEmpty() }
+    }
+
+    /** Wie `DayData::resolveSplitTime`: leer oder "aus" heisst ein Blatt, Unlesbares die Vorgabe. */
+    private fun teilung(eingabe: String?): LocalTime? {
+        val text = (eingabe ?: stamm.trennzeit ?: "").trim()
+        if (text.isEmpty() || text.lowercase() in setOf("aus", "off")) return null
+        val m = Regex("""^(\d{1,2}):(\d{2})$""").find(text) ?: return STANDARD_TRENNZEIT
+        val h = m.groupValues[1].toInt()
+        val min = m.groupValues[2].toInt()
+        return if (h <= 23 && min <= 59) LocalTime.of(h, min) else STANDARD_TRENNZEIT
+    }
+
+    /**
+     * Was `GET intern/monat` liefert: jeden Tag des Monats, auch die leeren, damit
+     * das Raster ohne Luecken steht. Vermerke zaehlen nicht als Gaeste.
+     */
+    fun monat(jahr: Int, monat: Int): Monatsuebersicht {
+        val von = LocalDate.of(jahr, monat, 1)
+        val bis = von.withDayOfMonth(von.lengthOfMonth())
+        val tage = generateSequence(von) { it.plusDays(1) }.takeWhile { it <= bis }.map { datum ->
+            val desTages = alle.filter { it.datum == datum.toString() && it.statusId != STORNIERT }
+            val (vermerkEintraege, gaeste) = desTages.partition { istVermerk(it) }
+            Monatstag(
+                datum = datum,
+                reservierungen = gaeste.size,
+                gaeste = gaeste.sumOf { it.gaeste },
+                gesperrt = datum.toString() in sperrtage,
+                grund = sperrtage[datum.toString()].orEmpty(),
+                vermerk = vermerkEintraege.isNotEmpty(),
+                vermerkText = vermerkEintraege.minByOrNull { it.id }?.kommentar.orEmpty(),
+                maxPax = LokalVermerke.maxPax(vermerke(datum)),
+            )
+        }.toList()
+        return Monatsuebersicht(jahr, monat, von, bis, tage.maxOfOrNull { it.gaeste } ?: 0, tage)
+    }
+
     /** Sperrtage ab heute, wie `BlockedDates::upcoming()`. */
     fun kommendeSperren(heute: LocalDate): Map<String, String> =
         sperrtage.filterKeys { it >= heute.toString() }.toSortedMap()
@@ -312,5 +400,10 @@ internal class LokalRechnung(
     companion object {
         val STORNIERT: Long = ReservationStatus.DEFAULTS.first { it.name == "Canceled" }.id
         val BESTAETIGT: Long = ReservationStatus.DEFAULTS.first { it.name == "Confirmed" }.id
+
+        /** Obergrenze fuer den Sammeldruck; sonst waere ein vertipptes Jahr ein Auftrag ueber Jahre. */
+        const val MAX_TAGE = 92L
+
+        private val STANDARD_TRENNZEIT: LocalTime = LocalTime.of(15, 0)
     }
 }
